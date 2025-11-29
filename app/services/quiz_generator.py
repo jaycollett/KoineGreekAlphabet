@@ -12,16 +12,19 @@ class QuestionType(str, Enum):
     LETTER_TO_NAME = "LETTER_TO_NAME"  # Show letter, ask for name
     NAME_TO_UPPER = "NAME_TO_UPPER"     # Show name, ask for uppercase
     NAME_TO_LOWER = "NAME_TO_LOWER"     # Show name, ask for lowercase
+    AUDIO_TO_UPPER = "AUDIO_TO_UPPER"   # Play audio, ask for uppercase
+    AUDIO_TO_LOWER = "AUDIO_TO_LOWER"   # Play audio, ask for lowercase
 
 
-def generate_question_types(count: int = 14) -> List[QuestionType]:
+def generate_question_types(count: int = 14, include_audio: bool = True) -> List[QuestionType]:
     """
     Generate a mixed list of question types.
 
-    Strategy: Aim for roughly even distribution among 3 types.
+    Strategy: Aim for roughly even distribution among all types.
 
     Args:
         count: Number of questions (default 14)
+        include_audio: Whether to include audio question types (default True)
 
     Returns:
         List of QuestionType values, shuffled
@@ -31,6 +34,12 @@ def generate_question_types(count: int = 14) -> List[QuestionType]:
         QuestionType.NAME_TO_UPPER,
         QuestionType.NAME_TO_LOWER
     ]
+
+    if include_audio:
+        types.extend([
+            QuestionType.AUDIO_TO_UPPER,
+            QuestionType.AUDIO_TO_LOWER
+        ])
 
     # Create roughly equal distribution
     per_type = count // len(types)
@@ -93,6 +102,8 @@ def format_question(
         display_letter = random.choice([letter.uppercase, letter.lowercase])
         correct_answer = letter.name
         options = [letter.name] + [d.name for d in distractors]
+        audio_file = None
+        is_audio_question = False
 
     elif question_type == QuestionType.NAME_TO_UPPER:
         # Show name, ask for uppercase
@@ -100,13 +111,35 @@ def format_question(
         display_letter = None
         correct_answer = letter.uppercase
         options = [letter.uppercase] + [d.uppercase for d in distractors]
+        audio_file = None
+        is_audio_question = False
 
-    else:  # NAME_TO_LOWER
+    elif question_type == QuestionType.NAME_TO_LOWER:
         # Show name, ask for lowercase
         prompt_text = f"Select the lowercase form of {letter.name}"
         display_letter = None
         correct_answer = letter.lowercase
         options = [letter.lowercase] + [d.lowercase for d in distractors]
+        audio_file = None
+        is_audio_question = False
+
+    elif question_type == QuestionType.AUDIO_TO_UPPER:
+        # Play audio, ask for uppercase
+        prompt_text = "Listen and select the uppercase form of this letter"
+        display_letter = None
+        correct_answer = letter.uppercase
+        options = [letter.uppercase] + [d.uppercase for d in distractors]
+        audio_file = f"/static/audio/{letter.name.lower()}.mp3"
+        is_audio_question = True
+
+    else:  # AUDIO_TO_LOWER
+        # Play audio, ask for lowercase
+        prompt_text = "Listen and select the lowercase form of this letter"
+        display_letter = None
+        correct_answer = letter.lowercase
+        options = [letter.lowercase] + [d.lowercase for d in distractors]
+        audio_file = f"/static/audio/{letter.name.lower()}.mp3"
+        is_audio_question = True
 
     # Shuffle options
     random.shuffle(options)
@@ -116,13 +149,16 @@ def format_question(
         "display_letter": display_letter,
         "options": options,
         "correct_answer": correct_answer,
-        "letter_name": letter.name
+        "letter_name": letter.name,
+        "audio_file": audio_file,
+        "is_audio_question": is_audio_question
     }
 
 
 def create_quiz(
     db: Session,
-    user_id: str
+    user_id: str,
+    include_audio: bool = True
 ) -> Tuple[QuizAttempt, List[Dict]]:
     """
     Create a new quiz with 14 questions.
@@ -136,6 +172,7 @@ def create_quiz(
     Args:
         db: Database session
         user_id: User UUID
+        include_audio: Whether to include audio question types (default True)
 
     Returns:
         Tuple of (QuizAttempt object, list of formatted question dicts)
@@ -151,7 +188,7 @@ def create_quiz(
 
     # Select letters and question types
     selected_letters = select_letters_for_quiz(db, user_id, count=14)
-    question_types = generate_question_types(count=14)
+    question_types = generate_question_types(count=14, include_audio=include_audio)
 
     formatted_questions = []
 

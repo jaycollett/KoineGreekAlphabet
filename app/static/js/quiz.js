@@ -4,7 +4,7 @@ let currentQuiz = null;
 let currentQuestionIndex = 0;
 let correctCount = 0;
 let awaitingNext = false;
-let currentLetterName = null;
+let currentAudio = null;
 
 async function startQuiz() {
     try {
@@ -22,11 +22,15 @@ async function startQuiz() {
         }
 
         // Start a new quiz
+        const includeAudio = localStorage.getItem('includeAudioQuestions') !== 'false';
         const response = await fetch('/api/quiz/start', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({
+                include_audio: includeAudio
+            })
         });
 
         if (!response.ok) {
@@ -107,15 +111,32 @@ function displayQuestion() {
     // Display question prompt
     document.getElementById('question-prompt').textContent = question.prompt;
 
-    // Display letter if present
+    // Display letter or audio player
     const letterDisplay = document.getElementById('letter-display');
-    if (question.display_letter) {
+    const audioDisplay = document.getElementById('audio-display');
+
+    if (question.is_audio_question) {
+        // Show audio player for audio questions
+        letterDisplay.classList.add('hidden');
+        audioDisplay.classList.remove('hidden');
+
+        // Auto-play audio once
+        if (currentAudio) {
+            currentAudio.pause();
+        }
+        currentAudio = new Audio(question.audio_file);
+        currentAudio.play().catch(error => {
+            console.error('Error playing audio:', error);
+        });
+    } else if (question.display_letter) {
+        // Show Greek letter
+        audioDisplay.classList.add('hidden');
         letterDisplay.classList.remove('hidden');
         document.getElementById('display-letter').textContent = question.display_letter;
-        currentLetterName = question.letter_name;
     } else {
+        // Hide both
         letterDisplay.classList.add('hidden');
-        currentLetterName = null;
+        audioDisplay.classList.add('hidden');
     }
 
     // Display options with dark theme
@@ -257,23 +278,13 @@ function showError(message) {
     alert(message);
 }
 
-function pronounceLetter() {
-    if (!currentLetterName) {
-        return;
+function playAudioAgain() {
+    if (currentAudio) {
+        currentAudio.currentTime = 0;
+        currentAudio.play().catch(error => {
+            console.error('Error playing audio:', error);
+        });
     }
-
-    // Create audio element and play pronunciation
-    const audio = new Audio(`/static/audio/${currentLetterName.toLowerCase()}.mp3`);
-    audio.play().catch(error => {
-        console.error('Error playing audio:', error);
-        // Fallback to Web Speech API if audio file not available
-        if ('speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance(currentLetterName);
-            utterance.rate = 0.8;
-            utterance.lang = 'en-US';
-            speechSynthesis.speak(utterance);
-        }
-    });
 }
 
 // Start quiz on page load

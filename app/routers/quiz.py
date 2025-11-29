@@ -21,6 +21,11 @@ class AnswerSubmission(BaseModel):
     selected_option: str
 
 
+class StartQuizRequest(BaseModel):
+    """Request body for starting a quiz."""
+    include_audio: bool = True
+
+
 def get_user_id_from_cookie(request: Request) -> str:
     """Extract user ID from cookie."""
     user_id = request.cookies.get(COOKIE_NAME)
@@ -69,16 +74,6 @@ async def get_quiz_state(
         # Determine question type and format accordingly
         qtype = QuestionType(question.question_type)
 
-        if qtype == QuestionType.LETTER_TO_NAME:
-            prompt = "Which letter is this?"
-            display_letter = letter.uppercase if i % 2 == 0 else letter.lowercase
-        elif qtype == QuestionType.NAME_TO_UPPER:
-            prompt = f"Select the uppercase form of {letter.name}"
-            display_letter = None
-        else:  # NAME_TO_LOWER
-            prompt = f"Select the lowercase form of {letter.name}"
-            display_letter = None
-
         # Get the correct answer and reconstruct options
         # Note: We need to regenerate options since we don't store them
         from app.services.quiz_generator import generate_distractors, format_question
@@ -93,6 +88,8 @@ async def get_quiz_state(
             "options": formatted["options"],
             "correct_answer": formatted["correct_answer"],
             "letter_name": letter.name,
+            "audio_file": formatted.get("audio_file"),
+            "is_audio_question": formatted.get("is_audio_question", False),
             "is_answered": question.chosen_option is not None,
             "was_correct": question.is_correct == 1 if question.chosen_option else None
         })
@@ -110,11 +107,15 @@ async def get_quiz_state(
 
 @router.post("/start")
 async def start_quiz(
+    quiz_request: StartQuizRequest,
     request: Request,
     db: Session = Depends(get_db)
 ):
     """
     Start a new quiz.
+
+    Args:
+        quiz_request: Request body with quiz preferences (include_audio)
 
     Returns:
     - quiz_id
@@ -123,7 +124,7 @@ async def start_quiz(
     user_id = get_user_id_from_cookie(request)
 
     # Create quiz with questions
-    quiz, questions = create_quiz(db, user_id)
+    quiz, questions = create_quiz(db, user_id, include_audio=quiz_request.include_audio)
 
     return {
         "quiz_id": quiz.id,
