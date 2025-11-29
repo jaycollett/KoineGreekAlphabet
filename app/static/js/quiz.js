@@ -4,6 +4,7 @@ let currentQuiz = null;
 let currentQuestionIndex = 0;
 let correctCount = 0;
 let awaitingNext = false;
+let currentLetterName = null;
 
 async function startQuiz() {
     try {
@@ -111,8 +112,10 @@ function displayQuestion() {
     if (question.display_letter) {
         letterDisplay.classList.remove('hidden');
         document.getElementById('display-letter').textContent = question.display_letter;
+        currentLetterName = question.letter_name;
     } else {
         letterDisplay.classList.add('hidden');
+        currentLetterName = null;
     }
 
     // Display options with dark theme
@@ -252,6 +255,25 @@ function nextQuestion() {
 
 function showError(message) {
     alert(message);
+}
+
+function pronounceLetter() {
+    if (!currentLetterName) {
+        return;
+    }
+
+    // Create audio element and play pronunciation
+    const audio = new Audio(`/static/audio/${currentLetterName.toLowerCase()}.mp3`);
+    audio.play().catch(error => {
+        console.error('Error playing audio:', error);
+        // Fallback to Web Speech API if audio file not available
+        if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(currentLetterName);
+            utterance.rate = 0.8;
+            utterance.lang = 'en-US';
+            speechSynthesis.speak(utterance);
+        }
+    });
 }
 
 // Start quiz on page load
