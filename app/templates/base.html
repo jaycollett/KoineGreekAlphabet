@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Greek Alphabet Mastery{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Greek font for better letter rendering -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;700&display=swap" rel="stylesheet">
     <style>
         /* Dark theme */
         body {
@@ -13,13 +17,15 @@
 
         /* Custom styles for large Greek letters */
         .greek-letter-display {
+            font-family: 'Noto Serif', serif;
             font-size: 8rem;
             line-height: 1;
-            font-weight: bold;
+            font-weight: 700;
         }
 
         /* Mobile-first button styling */
         .quiz-option {
+            font-family: 'Noto Serif', serif;
             min-height: 5rem;
             font-size: 1.5rem;
             transition: all 0.2s ease;
