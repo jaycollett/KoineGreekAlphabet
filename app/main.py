@@ -1,14 +1,25 @@
 """Main FastAPI application for Greek Alphabet Mastery."""
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from app.routers import user, quiz
+from app.db.init_db import init_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize database on startup."""
+    init_db()
+    yield
+
 
 app = FastAPI(
     title="Greek Alphabet Mastery",
     description="Mobile-first adaptive quiz app to master the Greek alphabet",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Mount static files
