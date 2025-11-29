@@ -44,3 +44,5 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/jaycollett/${{ env.REPO_NAME_LC }}:${{ env.TAG_NAME_LC }}, ghcr.io/jaycollett/${{ env.REPO_NAME_LC }}:latest
+          build-args: |
+            VERSION=${{ env.TAG_NAME_LC }}

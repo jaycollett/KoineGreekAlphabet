@@ -1,6 +1,9 @@
 # Greek Alphabet Mastery Dockerfile
 FROM python:3.11-slim
 
+# Build argument for version
+ARG VERSION=dev
+
 WORKDIR /app
 
 # Install system dependencies
@@ -18,6 +21,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app/
 COPY pytest.ini .
 COPY tests/ ./tests/
+
+# Replace version placeholder in template
+RUN sed -i "s/__VERSION__/${VERSION}/g" /app/app/templates/base.html
 
 # Create directory for database
 RUN mkdir -p /app/data
