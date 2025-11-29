@@ -3,7 +3,7 @@
 {% block title %}Quiz - Greek Alphabet Mastery{% endblock %}
 
 {% block content %}
-<div class="bg-slate-800 rounded-lg shadow-2xl p-6 md:p-8 border border-slate-700">
+<div class="bg-slate-800 rounded-lg shadow-2xl p-6 md:p-8 border border-slate-700 overflow-hidden">
     <!-- Loading State -->
     <div id="loading" class="text-center py-8">
         <div class="animate-pulse">
@@ -43,7 +43,7 @@
             <p class="text-2xl md:text-3xl text-gray-200 mb-8 font-medium" id="question-prompt"></p>
 
             <!-- Greek Letter Display (for LETTER_TO_NAME questions) -->
-            <div id="letter-display" class="hidden mb-8">
+            <div id="letter-display" class="hidden mb-8 overflow-hidden">
                 <div class="greek-letter-display text-white" id="display-letter"></div>
             </div>
         </div>

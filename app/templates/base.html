@@ -13,14 +13,17 @@
         /* Dark theme */
         body {
             background-color: #0f172a;
+            overflow-x: hidden;
         }
 
         /* Custom styles for large Greek letters */
         .greek-letter-display {
             font-family: 'Noto Serif', serif;
-            font-size: 8rem;
+            font-size: 6rem;
             line-height: 1;
             font-weight: 700;
+            max-width: 100%;
+            overflow: hidden;
         }
 
         /* Mobile-first button styling */
@@ -29,10 +32,18 @@
             min-height: 5rem;
             font-size: 1.5rem;
             transition: all 0.2s ease;
+            word-break: break-word;
+            box-sizing: border-box;
         }
 
         .quiz-option:hover:not(:disabled) {
-            transform: scale(1.02);
+            transform: scale(1.01);
+        }
+
+        /* Prevent horizontal overflow */
+        #quiz-content, #options-container {
+            max-width: 100%;
+            overflow-x: hidden;
         }
 
         .quiz-option.correct {
@@ -59,7 +70,7 @@
 
         @media (min-width: 768px) {
             .greek-letter-display {
-                font-size: 10rem;
+                font-size: 8rem;
             }
             .quiz-option {
                 font-size: 1.75rem;
