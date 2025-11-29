@@ -120,14 +120,19 @@ function displayQuestion() {
         letterDisplay.classList.add('hidden');
         audioDisplay.classList.remove('hidden');
 
-        // Auto-play audio once
+        // Auto-play audio once after it's loaded
         if (currentAudio) {
             currentAudio.pause();
         }
         currentAudio = new Audio(question.audio_file);
-        currentAudio.play().catch(error => {
-            console.error('Error playing audio:', error);
-        });
+
+        // Preload and play with a small delay
+        currentAudio.load();
+        setTimeout(() => {
+            currentAudio.play().catch(error => {
+                console.error('Error playing audio:', error);
+            });
+        }, 300); // 300ms delay to ensure audio is buffered
     } else if (question.display_letter) {
         // Show Greek letter
         audioDisplay.classList.add('hidden');
