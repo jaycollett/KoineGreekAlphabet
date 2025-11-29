@@ -244,22 +244,22 @@ async function selectAnswer(selectedOption, questionId, correctAnswer) {
                 sessionStorage.setItem('quizSummary', JSON.stringify(result.summary));
                 window.location.href = '/summary';
             };
-            // Auto-advance to summary after 3 seconds
+            // Auto-advance to summary after 2 seconds
             setTimeout(() => {
                 if (awaitingNext) {
                     sessionStorage.setItem('quizSummary', JSON.stringify(result.summary));
                     window.location.href = '/summary';
                 }
-            }, 3000);
+            }, 2000);
         } else {
             document.getElementById('next-button').textContent = 'Next Question';
             document.getElementById('next-button').onclick = nextQuestion;
-            // Auto-advance to next question after 3 seconds
+            // Auto-advance to next question after 2 seconds
             setTimeout(() => {
                 if (awaitingNext) {
                     nextQuestion();
                 }
-            }, 3000);
+            }, 2000);
         }
     } catch (error) {
         console.error('Error submitting answer:', error);
