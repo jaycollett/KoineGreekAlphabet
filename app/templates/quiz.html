@@ -3,7 +3,7 @@
 {% block title %}Quiz - Greek Alphabet Mastery{% endblock %}
 
 {% block content %}
-<div class="bg-slate-800 rounded-lg shadow-2xl p-6 md:p-8 border border-slate-700 overflow-hidden">
+<div class="bg-slate-800 rounded-lg shadow-2xl p-4 md:p-8 border border-slate-700 overflow-hidden">
     <!-- Loading State -->
     <div id="loading" class="text-center py-8">
         <div class="animate-pulse">
@@ -15,7 +15,7 @@
     <!-- Quiz Content -->
     <div id="quiz-content" class="hidden">
         <!-- Exit Button -->
-        <div class="mb-6 flex justify-between items-center">
+        <div class="mb-3 flex justify-between items-center">
             <a href="/"
                onclick="return confirm('Exit quiz? Your progress will be saved and you can resume later.');"
                class="text-gray-400 hover:text-gray-200 text-sm flex items-center gap-1 transition duration-200">
@@ -27,7 +27,7 @@
         </div>
 
         <!-- Progress Bar - Subtle -->
-        <div class="mb-8 opacity-60">
+        <div class="mb-4 opacity-60">
             <div class="flex justify-between text-xs text-gray-500 mb-1">
                 <span>Question <span id="current-question">1</span> of <span id="total-questions">14</span></span>
                 <span><span id="correct-count">0</span> correct</span>
@@ -38,27 +38,27 @@
         </div>
 
         <!-- Question Area - PROMINENT -->
-        <div class="text-center mb-8">
+        <div class="text-center mb-3">
             <!-- Question Prompt -->
-            <p class="text-xl md:text-2xl text-gray-200 mb-6 font-medium" id="question-prompt"></p>
+            <p class="text-lg md:text-2xl text-gray-200 mb-2 font-medium" id="question-prompt"></p>
 
             <!-- Greek Letter Display (for LETTER_TO_NAME questions) -->
-            <div id="letter-display" class="hidden mb-6">
+            <div id="letter-display" class="hidden mb-2">
                 <div class="greek-letter-display text-white" id="display-letter"></div>
             </div>
         </div>
 
         <!-- Answer Options -->
-        <div class="space-y-4" id="options-container">
+        <div class="space-y-3" id="options-container">
             <!-- Options will be inserted here -->
         </div>
 
         <!-- Next Question Button -->
-        <div id="next-button-container" class="hidden mt-8 text-center">
+        <div id="next-button-container" class="hidden mt-4 text-center">
             <button
                 id="next-button"
                 onclick="nextQuestion()"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition duration-200 shadow-lg"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-200 shadow-lg"
             >
                 Next Question
             </button>
