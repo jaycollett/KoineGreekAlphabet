@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Greek Alphabet Mastery{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Dark theme */
+        body {
+            background-color: #0f172a;
+        }
+
+        /* Custom styles for large Greek letters */
+        .greek-letter-display {
+            font-size: 8rem;
+            line-height: 1;
+            font-weight: bold;
+        }
+
+        /* Mobile-first button styling */
+        .quiz-option {
+            min-height: 5rem;
+            font-size: 1.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .quiz-option:hover:not(:disabled) {
+            transform: scale(1.02);
+        }
+
+        .quiz-option.correct {
+            background-color: #1e4d2b !important;
+            border-color: #4ade80 !important;
+            color: #d1fae5 !important;
+        }
+
+        .quiz-option.incorrect {
+            background-color: #4c1d1d !important;
+            border-color: #f87171 !important;
+            color: #fecaca !important;
+        }
+
+        .answer-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 0.5rem;
+            opacity: 0.9;
+        }
+
+        @media (min-width: 768px) {
+            .greek-letter-display {
+                font-size: 10rem;
+            }
+            .quiz-option {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-slate-900 min-h-screen">
+    <div class="container mx-auto px-4 py-6 max-w-3xl">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-blue-400 mb-2">
+                Greek Alphabet Mastery
+            </h1>
+            <p class="text-gray-400">Master all 24 Greek letters</p>
+        </header>
+
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="mt-12 text-center text-sm text-gray-500">
+            <p>Practice makes perfect</p>
+        </footer>
+    </div>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
