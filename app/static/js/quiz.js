@@ -132,7 +132,7 @@ function displayQuestion() {
             currentAudio.play().catch(error => {
                 console.error('Error playing audio:', error);
             });
-        }, 300); // 300ms delay to ensure audio is buffered
+        }, 350); // 350ms delay to ensure audio is buffered
     } else if (question.display_letter) {
         // Show Greek letter
         audioDisplay.classList.add('hidden');
