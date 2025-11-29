@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="bg-slate-800 rounded-lg shadow-2xl p-6 md:p-8 border border-slate-700">
+    <div id="loading" class="text-center py-8">
+        <div class="animate-pulse">
+            <div class="h-4 bg-slate-700 rounded w-3/4 mx-auto mb-4"></div>
+            <div class="h-4 bg-slate-700 rounded w-1/2 mx-auto"></div>
+        </div>
+    </div>
+
+    <div id="content" class="hidden">
+        <!-- Welcome Message -->
+        <div class="text-center mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-100">Welcome back!</h2>
+            <p class="text-gray-400 mb-4">Ready to practice?</p>
+
+            <button
+                onclick="startQuiz()"
+                class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition duration-200 shadow-lg"
+            >
+                Start Quiz
+            </button>
+        </div>
+
+        <!-- Stats Section -->
+        <div id="stats-section" class="hidden mt-8">
+            <h3 class="text-xl font-semibold mb-4 text-gray-100">Your Progress</h3>
+
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="bg-slate-700 rounded-lg p-4 text-center border border-slate-600">
+                    <div class="text-3xl font-bold text-blue-400" id="total-quizzes">0</div>
+                    <div class="text-sm text-gray-400">Quizzes Completed</div>
+                </div>
+                <div class="bg-slate-700 rounded-lg p-4 text-center border border-slate-600">
+                    <div class="text-3xl font-bold text-green-400" id="avg-accuracy">-</div>
+                    <div class="text-sm text-gray-400">Average Accuracy</div>
+                </div>
+            </div>
+
+            <!-- Quiz History -->
+            <div id="quiz-history-section" class="hidden mb-6">
+                <h4 class="font-semibold mb-3 text-gray-200">Recent Quizzes</h4>
+                <div id="quiz-history" class="space-y-2"></div>
+            </div>
+
+            <!-- Mastery Summary -->
+            <div id="mastery-section" class="hidden">
+                <div class="mb-4">
+                    <h4 class="font-semibold text-green-400 mb-2">Strong Letters</h4>
+                    <div id="strong-letters" class="text-sm text-gray-300"></div>
+                </div>
+
+                <div class="mb-4">
+                    <h4 class="font-semibold text-yellow-400 mb-2">Letters to Practice</h4>
+                    <div id="weak-letters" class="text-sm text-gray-300"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/app.js"></script>
+<script>
+    async function loadBootstrap() {
+        try {
+            const response = await fetch('/api/bootstrap');
+            const data = await response.json();
+
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('content').classList.remove('hidden');
+
+            // Update stats
+            if (data.total_quizzes > 0) {
+                document.getElementById('stats-section').classList.remove('hidden');
+                document.getElementById('total-quizzes').textContent = data.total_quizzes;
+
+                if (data.average_accuracy !== null) {
+                    document.getElementById('avg-accuracy').textContent =
+                        Math.round(data.average_accuracy * 100) + '%';
+                }
+
+                // Show quiz history
+                if (data.quiz_history && data.quiz_history.length > 0) {
+                    document.getElementById('quiz-history-section').classList.remove('hidden');
+                    const historyEl = document.getElementById('quiz-history');
+                    historyEl.innerHTML = data.quiz_history.map(quiz => `
+                        <div class="flex justify-between items-center bg-slate-700 rounded p-2 border border-slate-600">
+                            <span class="text-sm text-gray-400">
+                                ${new Date(quiz.completed_at).toLocaleDateString()}
+                            </span>
+                            <span class="font-semibold ${quiz.accuracy >= 0.8 ? 'text-green-400' : 'text-yellow-400'}">
+                                ${quiz.correct_count}/${quiz.question_count} (${Math.round(quiz.accuracy * 100)}%)
+                            </span>
+                        </div>
+                    `).join('');
+                }
+
+                // Show mastery summary
+                if (data.mastery_summary) {
+                    const hasData = data.mastery_summary.strong.length > 0 ||
+                                   data.mastery_summary.weak.length > 0;
+
+                    if (hasData) {
+                        document.getElementById('mastery-section').classList.remove('hidden');
+
+                        const strongEl = document.getElementById('strong-letters');
+                        if (data.mastery_summary.strong.length > 0) {
+                            strongEl.textContent = data.mastery_summary.strong
+                                .slice(0, 5)
+                                .map(l => l.name)
+                                .join(', ');
+                        } else {
+                            strongEl.textContent = 'Keep practicing!';
+                        }
+
+                        const weakEl = document.getElementById('weak-letters');
+                        if (data.mastery_summary.weak.length > 0) {
+                            weakEl.textContent = data.mastery_summary.weak
+                                .slice(0, 5)
+                                .map(l => l.name)
+                                .join(', ');
+                        } else {
+                            weakEl.textContent = 'None - great job!';
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error loading bootstrap data:', error);
+            document.getElementById('loading').innerHTML =
+                '<p class="text-red-400">Error loading data. Please refresh.</p>';
+        }
+    }
+
+    function startQuiz() {
+        window.location.href = '/quiz';
+    }
+
+    // Load data on page load
+    loadBootstrap();
+</script>
+{% endblock %}

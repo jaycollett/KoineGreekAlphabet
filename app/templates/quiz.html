@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Quiz - Greek Alphabet Mastery{% endblock %}
+
+{% block content %}
+<div class="bg-slate-800 rounded-lg shadow-2xl p-6 md:p-8 border border-slate-700">
+    <!-- Loading State -->
+    <div id="loading" class="text-center py-8">
+        <div class="animate-pulse">
+            <div class="h-4 bg-slate-700 rounded w-3/4 mx-auto mb-4"></div>
+            <div class="h-4 bg-slate-700 rounded w-1/2 mx-auto"></div>
+        </div>
+    </div>
+
+    <!-- Quiz Content -->
+    <div id="quiz-content" class="hidden">
+        <!-- Exit Button -->
+        <div class="mb-6 flex justify-between items-center">
+            <a href="/"
+               onclick="return confirm('Exit quiz? Your progress will be saved and you can resume later.');"
+               class="text-gray-400 hover:text-gray-200 text-sm flex items-center gap-1 transition duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Home
+            </a>
+        </div>
+
+        <!-- Progress Bar - Subtle -->
+        <div class="mb-8 opacity-60">
+            <div class="flex justify-between text-xs text-gray-500 mb-1">
+                <span>Question <span id="current-question">1</span> of <span id="total-questions">14</span></span>
+                <span><span id="correct-count">0</span> correct</span>
+            </div>
+            <div class="w-full bg-slate-700 rounded-full h-1">
+                <div id="progress-bar" class="bg-blue-500 h-1 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Question Area - PROMINENT -->
+        <div class="text-center mb-12">
+            <!-- Question Prompt -->
+            <p class="text-2xl md:text-3xl text-gray-200 mb-8 font-medium" id="question-prompt"></p>
+
+            <!-- Greek Letter Display (for LETTER_TO_NAME questions) -->
+            <div id="letter-display" class="hidden mb-8">
+                <div class="greek-letter-display text-white" id="display-letter"></div>
+            </div>
+        </div>
+
+        <!-- Answer Options -->
+        <div class="space-y-4" id="options-container">
+            <!-- Options will be inserted here -->
+        </div>
+
+        <!-- Next Question Button -->
+        <div id="next-button-container" class="hidden mt-8 text-center">
+            <button
+                id="next-button"
+                onclick="nextQuestion()"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition duration-200 shadow-lg"
+            >
+                Next Question
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/quiz.js"></script>
+{% endblock %}
