@@ -1,7 +1,13 @@
-"""Database initialization and Greek alphabet seeding."""
+"""Database initialization and Greek alphabet seeding with auto-migration."""
+import logging
+from typing import Set, List
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import OperationalError
 from app.db.database import engine, SessionLocal, Base
 from app.db.models import Letter
+
+logger = logging.getLogger(__name__)
 
 # Complete Greek alphabet with uppercase and lowercase
 GREEK_ALPHABET = [
@@ -49,19 +55,153 @@ def seed_letters(db: Session) -> None:
     print(f"Successfully seeded {len(GREEK_ALPHABET)} Greek letters.")
 
 
+def check_column_exists(inspector, table_name: str, column_name: str) -> bool:
+    """Check if a column exists in a table."""
+    try:
+        columns = [col['name'] for col in inspector.get_columns(table_name)]
+        return column_name in columns
+    except Exception as e:
+        logger.warning(f"Error checking column {column_name} in {table_name}: {e}")
+        return False
+
+
+def check_index_exists(inspector, table_name: str, index_name: str) -> bool:
+    """Check if an index exists on a table."""
+    try:
+        indexes = inspector.get_indexes(table_name)
+        return any(idx['name'] == index_name for idx in indexes)
+    except Exception as e:
+        logger.warning(f"Error checking index {index_name} in {table_name}: {e}")
+        return False
+
+
+def apply_schema_migrations(db: Session) -> None:
+    """
+    Apply schema migrations automatically on startup.
+
+    This function detects and applies necessary schema changes:
+    - Add missing columns to QuizQuestion (option_1, option_2, option_3, option_4)
+    - Add indexes for query performance
+    - Add unique constraints
+
+    All operations are idempotent and safe for production.
+    """
+    inspector = inspect(engine)
+
+    # Get list of existing tables
+    existing_tables = inspector.get_table_names()
+
+    if not existing_tables:
+        logger.info("No existing tables found. Schema will be created from scratch.")
+        return
+
+    logger.info("Checking for necessary schema migrations...")
+    migrations_applied = []
+
+    # Migration 1: Add option columns to quiz_questions table
+    if 'quiz_questions' in existing_tables:
+        option_columns = ['option_1', 'option_2', 'option_3', 'option_4']
+
+        for col in option_columns:
+            if not check_column_exists(inspector, 'quiz_questions', col):
+                try:
+                    logger.info(f"Adding column {col} to quiz_questions table...")
+                    db.execute(text(f"ALTER TABLE quiz_questions ADD COLUMN {col} TEXT"))
+                    migrations_applied.append(f"Added column quiz_questions.{col}")
+                except OperationalError as e:
+                    # Column might already exist (race condition)
+                    logger.warning(f"Could not add column {col}: {e}")
+
+    # Migration 2: Add indexes to user_letter_stats
+    if 'user_letter_stats' in existing_tables:
+        indexes_to_add = [
+            ('idx_user_mastery', 'CREATE INDEX IF NOT EXISTS idx_user_mastery ON user_letter_stats (user_id, mastery_score)'),
+            ('idx_user_seen_count', 'CREATE INDEX IF NOT EXISTS idx_user_seen_count ON user_letter_stats (user_id, seen_count)')
+        ]
+
+        for idx_name, sql in indexes_to_add:
+            if not check_index_exists(inspector, 'user_letter_stats', idx_name):
+                try:
+                    logger.info(f"Creating index {idx_name}...")
+                    db.execute(text(sql))
+                    migrations_applied.append(f"Created index {idx_name}")
+                except OperationalError as e:
+                    logger.warning(f"Could not create index {idx_name}: {e}")
+
+    # Migration 3: Add indexes to quiz_attempts
+    if 'quiz_attempts' in existing_tables:
+        if not check_index_exists(inspector, 'quiz_attempts', 'idx_user_completed'):
+            try:
+                logger.info("Creating index idx_user_completed...")
+                db.execute(text('CREATE INDEX IF NOT EXISTS idx_user_completed ON quiz_attempts (user_id, completed_at)'))
+                migrations_applied.append("Created index idx_user_completed")
+            except OperationalError as e:
+                logger.warning(f"Could not create index idx_user_completed: {e}")
+
+    # Migration 4: Add index to quiz_questions
+    if 'quiz_questions' in existing_tables:
+        if not check_index_exists(inspector, 'quiz_questions', 'idx_quiz_correct'):
+            try:
+                logger.info("Creating index idx_quiz_correct...")
+                db.execute(text('CREATE INDEX IF NOT EXISTS idx_quiz_correct ON quiz_questions (quiz_id, is_correct)'))
+                migrations_applied.append("Created index idx_quiz_correct")
+            except OperationalError as e:
+                logger.warning(f"Could not create index idx_quiz_correct: {e}")
+
+    # Commit all migrations
+    if migrations_applied:
+        try:
+            db.commit()
+            logger.info(f"Applied {len(migrations_applied)} schema migrations:")
+            for migration in migrations_applied:
+                logger.info(f"  - {migration}")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error committing migrations: {e}")
+            raise
+    else:
+        logger.info("No schema migrations needed. Database is up to date.")
+
+
 def init_db() -> None:
-    """Initialize database: create all tables and seed data."""
-    print("Creating database tables...")
+    """
+    Initialize database: create tables, apply migrations, and seed data.
+
+    This function:
+    1. Creates all tables from SQLAlchemy models
+    2. Applies any necessary schema migrations
+    3. Seeds initial data (Greek alphabet)
+
+    Safe to call multiple times - all operations are idempotent.
+    """
+    logger.info("Initializing database...")
+
+    # Create all tables (idempotent - does nothing if tables exist)
+    logger.info("Creating database tables from models...")
     Base.metadata.create_all(bind=engine)
-    print("Tables created successfully.")
+    logger.info("Tables created/verified successfully.")
 
     db = SessionLocal()
     try:
+        # Apply any pending schema migrations
+        apply_schema_migrations(db)
+
+        # Seed initial data
         seed_letters(db)
+
+        logger.info("Database initialization complete.")
+    except Exception as e:
+        logger.error(f"Error during database initialization: {e}")
+        raise
     finally:
         db.close()
 
 
 if __name__ == "__main__":
+    # Set up basic logging for standalone execution
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
     init_db()
     print("Database initialization complete.")

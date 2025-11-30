@@ -1,7 +1,16 @@
 """Mastery score calculation and state determination."""
 from enum import Enum
-from typing import Dict
+from typing import Dict, Any
 from app.db.models import UserLetterStat
+from app.constants import (
+    MASTERY_MIN_ATTEMPTS,
+    MASTERY_ACCURACY_WEIGHT,
+    MASTERY_STREAK_BONUS_PER_CORRECT,
+    MAX_STREAK_FOR_MASTERY,
+    MASTERED_MIN_ATTEMPTS,
+    MASTERED_MIN_ACCURACY,
+    MASTERED_MIN_STREAK
+)
 
 
 class MasteryState(str, Enum):
@@ -16,9 +25,9 @@ def calculate_mastery_score(seen_count: int, correct_count: int, current_streak:
     Calculate mastery score for a letter based on performance.
 
     Formula:
-    - If seen_count < 3: Cap score low (not enough data)
+    - If seen_count < MASTERY_MIN_ATTEMPTS: Cap score low (not enough data)
     - Otherwise: Base on accuracy with streak bonus
-    - mastery_score = clamp(0, 1, accuracy * 0.8 + min(current_streak, 5) * 0.04)
+    - mastery_score = clamp(0, 1, accuracy * MASTERY_ACCURACY_WEIGHT + min(current_streak, MAX_STREAK_FOR_MASTERY) * MASTERY_STREAK_BONUS_PER_CORRECT)
 
     Args:
         seen_count: Total times this letter has been seen
@@ -34,12 +43,12 @@ def calculate_mastery_score(seen_count: int, correct_count: int, current_streak:
     accuracy = correct_count / max(1, seen_count)
 
     # Not enough data yet - cap the score
-    if seen_count < 3:
+    if seen_count < MASTERY_MIN_ATTEMPTS:
         return min(accuracy * 0.5, 0.4)
 
     # Standard formula with streak bonus
-    streak_bonus = min(current_streak, 5) * 0.04
-    score = accuracy * 0.8 + streak_bonus
+    streak_bonus = min(current_streak, MAX_STREAK_FOR_MASTERY) * MASTERY_STREAK_BONUS_PER_CORRECT
+    score = accuracy * MASTERY_ACCURACY_WEIGHT + streak_bonus
 
     # Clamp between 0 and 1
     return max(0.0, min(1.0, score))
@@ -52,7 +61,9 @@ def get_mastery_state(seen_count: int, correct_count: int, current_streak: int) 
     States:
     - UNSEEN: Never attempted (seen_count == 0)
     - LEARNING: Attempted but not mastered
-    - MASTERED: At least 8 attempts AND accuracy >= 0.9 AND streak >= 3
+    - MASTERED: At least MASTERED_MIN_ATTEMPTS attempts AND
+                accuracy >= MASTERED_MIN_ACCURACY AND
+                streak >= MASTERED_MIN_STREAK
 
     Args:
         seen_count: Total times this letter has been seen
@@ -67,8 +78,10 @@ def get_mastery_state(seen_count: int, correct_count: int, current_streak: int) 
 
     accuracy = correct_count / seen_count
 
-    # Mastery criteria: 8+ attempts, 90%+ accuracy, 3+ streak
-    if seen_count >= 8 and accuracy >= 0.9 and current_streak >= 3:
+    # Mastery criteria defined by constants
+    if (seen_count >= MASTERED_MIN_ATTEMPTS and
+        accuracy >= MASTERED_MIN_ACCURACY and
+        current_streak >= MASTERED_MIN_STREAK):
         return MasteryState.MASTERED
 
     return MasteryState.LEARNING
@@ -77,7 +90,7 @@ def get_mastery_state(seen_count: int, correct_count: int, current_streak: int) 
 def update_letter_stats(
     stat: UserLetterStat,
     is_correct: bool
-) -> Dict[str, any]:
+) -> Dict[str, Any]:
     """
     Update user letter statistics after an answer.
 

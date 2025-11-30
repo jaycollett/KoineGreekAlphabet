@@ -18,14 +18,24 @@ class TestQuestionTypeGeneration:
         types = generate_question_types(count=14)
         assert len(types) == 14
 
-    def test_mixes_all_three_types(self):
-        """Should include all three question types."""
-        types = generate_question_types(count=14)
+    def test_mixes_all_types_without_audio(self):
+        """Should include all three non-audio question types."""
+        types = generate_question_types(count=14, include_audio=False)
         unique_types = set(types)
 
         assert QuestionType.LETTER_TO_NAME in unique_types
         assert QuestionType.NAME_TO_UPPER in unique_types
         assert QuestionType.NAME_TO_LOWER in unique_types
+        assert QuestionType.AUDIO_TO_UPPER not in unique_types
+        assert QuestionType.AUDIO_TO_LOWER not in unique_types
+
+    def test_includes_audio_types_when_enabled(self):
+        """Should include audio question types when include_audio=True."""
+        types = generate_question_types(count=14, include_audio=True)
+        unique_types = set(types)
+
+        # Should include at least some audio types
+        assert QuestionType.AUDIO_TO_UPPER in unique_types or QuestionType.AUDIO_TO_LOWER in unique_types
 
     def test_roughly_even_distribution(self):
         """Question types should be roughly evenly distributed."""
@@ -184,3 +194,119 @@ class TestQuizCreation:
             assert "options" in question
             assert "correct_answer" in question
             assert len(question["options"]) == 4
+
+
+class TestAudioQuestions:
+    """Tests for audio question generation and formatting."""
+
+    def test_audio_to_upper_format(self, test_db):
+        """AUDIO_TO_UPPER question should have correct format and audio file path."""
+        letter = test_db.query(Letter).first()
+        distractors = generate_distractors(test_db, letter, count=3)
+
+        question = format_question(letter, QuestionType.AUDIO_TO_UPPER, distractors)
+
+        assert "Listen" in question["prompt"]
+        assert "uppercase" in question["prompt"]
+        assert question["display_letter"] is None
+        assert question["correct_answer"] == letter.uppercase
+        assert question["audio_file"] is not None
+        assert question["is_audio_question"] is True
+        assert letter.name.lower() in question["audio_file"]
+        assert ".mp3" in question["audio_file"]
+
+    def test_audio_to_lower_format(self, test_db):
+        """AUDIO_TO_LOWER question should have correct format and audio file path."""
+        letter = test_db.query(Letter).first()
+        distractors = generate_distractors(test_db, letter, count=3)
+
+        question = format_question(letter, QuestionType.AUDIO_TO_LOWER, distractors)
+
+        assert "Listen" in question["prompt"]
+        assert "lowercase" in question["prompt"]
+        assert question["display_letter"] is None
+        assert question["correct_answer"] == letter.lowercase
+        assert question["audio_file"] is not None
+        assert question["is_audio_question"] is True
+        assert letter.name.lower() in question["audio_file"]
+
+    def test_audio_file_path_generation(self, test_db):
+        """Audio file paths should follow correct naming convention."""
+        from app.constants import AUDIO_PATH_TEMPLATE
+
+        # Test with different letters
+        letters = test_db.query(Letter).limit(3).all()
+
+        for letter in letters:
+            distractors = generate_distractors(test_db, letter, count=3)
+            question = format_question(letter, QuestionType.AUDIO_TO_UPPER, distractors)
+
+            expected_path = AUDIO_PATH_TEMPLATE.format(letter_name=letter.name.lower())
+            assert question["audio_file"] == expected_path
+
+    def test_is_audio_question_flag_correctness(self, test_db):
+        """is_audio_question flag should be True only for audio types."""
+        letter = test_db.query(Letter).first()
+        distractors = generate_distractors(test_db, letter, count=3)
+
+        # Non-audio questions
+        for qtype in [QuestionType.LETTER_TO_NAME, QuestionType.NAME_TO_UPPER, QuestionType.NAME_TO_LOWER]:
+            question = format_question(letter, qtype, distractors)
+            assert question["is_audio_question"] is False
+            assert question["audio_file"] is None
+
+        # Audio questions
+        for qtype in [QuestionType.AUDIO_TO_UPPER, QuestionType.AUDIO_TO_LOWER]:
+            question = format_question(letter, qtype, distractors)
+            assert question["is_audio_question"] is True
+            assert question["audio_file"] is not None
+
+    def test_quiz_with_audio_questions(self, test_db, test_user):
+        """Quiz created with include_audio=True should contain audio questions."""
+        all_letters = test_db.query(Letter).all()
+        from app.db.models import UserLetterStat
+        for letter in all_letters:
+            stat = UserLetterStat(user_id=test_user.id, letter_id=letter.id)
+            test_db.add(stat)
+        test_db.commit()
+
+        quiz, questions = create_quiz(test_db, test_user.id, include_audio=True)
+
+        # Should have at least some audio questions
+        audio_questions = [q for q in questions if q.get("is_audio_question")]
+        assert len(audio_questions) > 0
+
+        # All audio questions should have audio_file
+        for q in audio_questions:
+            assert q["audio_file"] is not None
+            assert ".mp3" in q["audio_file"]
+
+    def test_quiz_without_audio_questions(self, test_db, test_user):
+        """Quiz created with include_audio=False should not contain audio questions."""
+        all_letters = test_db.query(Letter).all()
+        from app.db.models import UserLetterStat
+        for letter in all_letters:
+            stat = UserLetterStat(user_id=test_user.id, letter_id=letter.id)
+            test_db.add(stat)
+        test_db.commit()
+
+        quiz, questions = create_quiz(test_db, test_user.id, include_audio=False)
+
+        # Should have no audio questions
+        audio_questions = [q for q in questions if q.get("is_audio_question")]
+        assert len(audio_questions) == 0
+
+    def test_audio_question_options_are_symbols(self, test_db):
+        """Audio questions should show letter symbols (uppercase/lowercase) as options."""
+        letter = test_db.query(Letter).first()
+        distractors = generate_distractors(test_db, letter, count=3)
+
+        # AUDIO_TO_UPPER
+        question_upper = format_question(letter, QuestionType.AUDIO_TO_UPPER, distractors)
+        assert all(len(opt) <= 2 for opt in question_upper["options"])  # Greek symbols are 1-2 chars
+        assert letter.uppercase in question_upper["options"]
+
+        # AUDIO_TO_LOWER
+        question_lower = format_question(letter, QuestionType.AUDIO_TO_LOWER, distractors)
+        assert all(len(opt) <= 2 for opt in question_lower["options"])
+        assert letter.lowercase in question_lower["options"]

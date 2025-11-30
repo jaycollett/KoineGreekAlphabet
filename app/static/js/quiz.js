@@ -120,9 +120,11 @@ function displayQuestion() {
         letterDisplay.classList.add('hidden');
         audioDisplay.classList.remove('hidden');
 
-        // Auto-play audio once after it's loaded
+        // Clean up previous audio to prevent memory leak
         if (currentAudio) {
             currentAudio.pause();
+            currentAudio.src = '';  // Release resources
+            currentAudio = null;
         }
         currentAudio = new Audio(question.audio_file);
 

@@ -8,11 +8,11 @@ from sqlalchemy import desc
 from app.db.database import get_db
 from app.db.models import User, UserLetterStat, Letter, QuizAttempt
 from app.services.mastery import get_mastery_state
+from app.config import settings
 
 router = APIRouter(prefix="/api", tags=["user"])
 
 COOKIE_NAME = "gam_uid"
-COOKIE_MAX_AGE = 365 * 24 * 60 * 60  # 1 year in seconds
 
 
 def get_or_create_user(request: Request, response: Response, db: Session) -> str:
@@ -51,13 +51,14 @@ def get_or_create_user(request: Request, response: Response, db: Session) -> str
 
     db.commit()
 
-    # Set cookie
+    # Set cookie with security settings from config
     response.set_cookie(
         key=COOKIE_NAME,
         value=user_id,
-        max_age=COOKIE_MAX_AGE,
-        httponly=True,
-        samesite="lax"
+        max_age=settings.COOKIE_MAX_AGE,
+        httponly=settings.COOKIE_HTTPONLY,
+        samesite=settings.COOKIE_SAMESITE,
+        secure=settings.COOKIE_SECURE  # Enable in production via COOKIE_SECURE=true env var
     )
 
     return user_id

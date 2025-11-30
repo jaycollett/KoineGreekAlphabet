@@ -4,6 +4,12 @@ from typing import List, Tuple
 from sqlalchemy.orm import Session
 from app.db.models import Letter, UserLetterStat, QuizAttempt
 from app.services.mastery import MasteryState, get_mastery_state
+from app.constants import (
+    QUESTIONS_PER_QUIZ,
+    ADAPTIVE_MODE_THRESHOLD,
+    RECENT_SELECTION_WINDOW,
+    WEAK_LETTER_RATIO
+)
 
 
 def get_total_questions_answered(db: Session, user_id: str) -> int:
@@ -21,14 +27,14 @@ def get_total_questions_answered(db: Session, user_id: str) -> int:
         QuizAttempt.user_id == user_id,
         QuizAttempt.completed_at.isnot(None)
     ).count()
-    return result * 14  # Each quiz has 14 questions
+    return result * QUESTIONS_PER_QUIZ
 
 
 def should_use_adaptive_mode(db: Session, user_id: str) -> bool:
     """
     Determine if adaptive mode should be active.
 
-    Adaptive mode activates after 10 completed quizzes (140 questions).
+    Adaptive mode activates after ADAPTIVE_MODE_THRESHOLD completed quizzes.
 
     Args:
         db: Database session
@@ -41,7 +47,7 @@ def should_use_adaptive_mode(db: Session, user_id: str) -> bool:
         QuizAttempt.user_id == user_id,
         QuizAttempt.completed_at.isnot(None)
     ).count()
-    return completed_quizzes >= 10
+    return completed_quizzes >= ADAPTIVE_MODE_THRESHOLD
 
 
 def get_user_letter_stats_map(db: Session, user_id: str) -> dict:
@@ -73,7 +79,7 @@ def select_letter_balanced(
     Strategy:
     - Spread questions across all letters
     - Prefer letters with fewer exposures
-    - Avoid recent repetitions
+    - Avoid recent repetitions (RECENT_SELECTION_WINDOW)
 
     Args:
         db: Database session
@@ -90,7 +96,7 @@ def select_letter_balanced(
 
     for letter in all_letters:
         # Reduce weight if recently selected
-        if letter.id in recent_selections[-3:]:  # Last 3 questions
+        if letter.id in recent_selections[-RECENT_SELECTION_WINDOW:]:
             continue
 
         stat = stats_map.get(letter.id)
@@ -116,18 +122,18 @@ def select_letter_adaptive(
     force_weak: bool = False
 ) -> Letter:
     """
-    Select a letter using adaptive mode (after 10 quizzes).
+    Select a letter using adaptive mode (after ADAPTIVE_MODE_THRESHOLD quizzes).
 
     Strategy:
-    - 60% from weaker letters (non-mastered, weighted by weakness)
-    - 40% from all letters (for coverage)
+    - WEAK_LETTER_RATIO (60%) from weaker letters (non-mastered, weighted by weakness)
+    - Remaining (40%) from all letters (for coverage)
 
     Args:
         db: Database session
         all_letters: List of all Letter objects
         stats_map: Dictionary of letter_id -> UserLetterStat
         recent_selections: Recently selected letter IDs to avoid
-        force_weak: If True, force selection from weak letters (for 60% quota)
+        force_weak: If True, force selection from weak letters (for weak quota)
 
     Returns:
         Selected Letter object
@@ -139,7 +145,7 @@ def select_letter_adaptive(
 
     for letter in all_letters:
         # Reduce weight if recently selected
-        if letter.id in recent_selections[-3:]:
+        if letter.id in recent_selections[-RECENT_SELECTION_WINDOW:]:
             continue
 
         stat = stats_map.get(letter.id)
@@ -201,9 +207,9 @@ def select_letters_for_quiz(
 
     for i in range(count):
         if use_adaptive:
-            # 60% weak, 40% coverage
+            # WEAK_LETTER_RATIO weak, remaining for coverage
             # For 14 questions: first 8-9 from weak, rest from all
-            force_weak = i < int(count * 0.6)
+            force_weak = i < int(count * WEAK_LETTER_RATIO)
             letter = select_letter_adaptive(
                 db, all_letters, stats_map, recent_selections, force_weak
             )

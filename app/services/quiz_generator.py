@@ -2,9 +2,11 @@
 import random
 from enum import Enum
 from typing import List, Dict, Tuple
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.db.models import Letter, QuizAttempt, QuizQuestion
 from app.services.adaptive import select_letters_for_quiz
+from app.constants import QUESTIONS_PER_QUIZ, DISTRACTOR_COUNT, AUDIO_PATH_TEMPLATE
 
 
 class QuestionType(str, Enum):
@@ -62,7 +64,9 @@ def generate_distractors(
     count: int = 3
 ) -> List[Letter]:
     """
-    Generate distractor letters for multiple choice.
+    Generate distractor letters for multiple choice using SQL-level random sampling.
+
+    This approach is more efficient than loading all letters and sampling in Python.
 
     Args:
         db: Database session
@@ -72,12 +76,15 @@ def generate_distractors(
     Returns:
         List of Letter objects (distractors only, not including correct)
     """
-    all_letters = db.query(Letter).filter(Letter.id != correct_letter.id).all()
+    # Use SQL-level random sampling for better performance
+    distractors = db.query(Letter).filter(
+        Letter.id != correct_letter.id
+    ).order_by(func.random()).limit(count).all()
 
-    if len(all_letters) < count:
+    if len(distractors) < count:
         raise ValueError(f"Not enough letters for {count} distractors")
 
-    return random.sample(all_letters, count)
+    return distractors
 
 
 def format_question(
@@ -129,7 +136,7 @@ def format_question(
         display_letter = None
         correct_answer = letter.uppercase
         options = [letter.uppercase] + [d.uppercase for d in distractors]
-        audio_file = f"/static/audio/{letter.name.lower()}.mp3"
+        audio_file = AUDIO_PATH_TEMPLATE.format(letter_name=letter.name.lower())
         is_audio_question = True
 
     else:  # AUDIO_TO_LOWER
@@ -138,7 +145,7 @@ def format_question(
         display_letter = None
         correct_answer = letter.lowercase
         options = [letter.lowercase] + [d.lowercase for d in distractors]
-        audio_file = f"/static/audio/{letter.name.lower()}.mp3"
+        audio_file = AUDIO_PATH_TEMPLATE.format(letter_name=letter.name.lower())
         is_audio_question = True
 
     # Shuffle options
@@ -161,10 +168,10 @@ def create_quiz(
     include_audio: bool = True
 ) -> Tuple[QuizAttempt, List[Dict]]:
     """
-    Create a new quiz with 14 questions.
+    Create a new quiz with QUESTIONS_PER_QUIZ questions.
 
     Process:
-    1. Select 14 letters using adaptive algorithm
+    1. Select letters using adaptive algorithm
     2. Generate question types (mixed)
     3. Create QuizAttempt and QuizQuestion records
     4. Format questions for frontend
@@ -180,15 +187,15 @@ def create_quiz(
     # Create quiz attempt
     quiz = QuizAttempt(
         user_id=user_id,
-        question_count=14,
+        question_count=QUESTIONS_PER_QUIZ,
         correct_count=0
     )
     db.add(quiz)
     db.flush()  # Get quiz.id without committing
 
     # Select letters and question types
-    selected_letters = select_letters_for_quiz(db, user_id, count=14)
-    question_types = generate_question_types(count=14, include_audio=include_audio)
+    selected_letters = select_letters_for_quiz(db, user_id, count=QUESTIONS_PER_QUIZ)
+    question_types = generate_question_types(count=QUESTIONS_PER_QUIZ, include_audio=include_audio)
 
     # Shuffle selected_letters to ensure random pairing with question types
     # (both lists are independently randomized, but zip creates deterministic pairing)
@@ -198,17 +205,21 @@ def create_quiz(
 
     for i, (letter, qtype) in enumerate(zip(selected_letters, question_types)):
         # Generate distractors
-        distractors = generate_distractors(db, letter, count=3)
+        distractors = generate_distractors(db, letter, count=DISTRACTOR_COUNT)
 
         # Format question for frontend
         formatted = format_question(letter, qtype, distractors)
 
-        # Create database record
+        # Create database record with stored options to prevent regeneration issues
         question = QuizQuestion(
             quiz_id=quiz.id,
             letter_id=letter.id,
             question_type=qtype.value,
-            correct_option=formatted["correct_answer"]
+            correct_option=formatted["correct_answer"],
+            option_1=formatted["options"][0] if len(formatted["options"]) > 0 else None,
+            option_2=formatted["options"][1] if len(formatted["options"]) > 1 else None,
+            option_3=formatted["options"][2] if len(formatted["options"]) > 2 else None,
+            option_4=formatted["options"][3] if len(formatted["options"]) > 3 else None
         )
         db.add(question)
         db.flush()

@@ -2,23 +2,36 @@
 from datetime import datetime
 from typing import Dict
 from fastapi import APIRouter, Depends, Request, HTTPException
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from pydantic import BaseModel, Field, validator
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 from app.db.database import get_db
 from app.db.models import QuizAttempt, QuizQuestion, UserLetterStat, Letter
 from app.services.quiz_generator import create_quiz, evaluate_answer
 from app.services.mastery import update_letter_stats, get_mastery_state
+from app.constants import (
+    COOKIE_NAME,
+    MIN_LETTER_OCCURRENCES_IN_QUIZ,
+    MIN_ATTEMPTS_FOR_WEAK_IDENTIFICATION,
+    WEAK_LETTER_THRESHOLD,
+    RECENT_QUIZ_HISTORY_LIMIT,
+    WEAK_LETTERS_SUMMARY_COUNT
+)
 
 router = APIRouter(prefix="/api/quiz", tags=["quiz"])
-
-COOKIE_NAME = "gam_uid"
 
 
 class AnswerSubmission(BaseModel):
     """Request body for answer submission."""
-    question_id: int
-    selected_option: str
+    question_id: int = Field(..., gt=0, description="Question ID must be a positive integer")
+    selected_option: str = Field(..., min_length=1, max_length=100, description="Selected option text")
+
+    @validator('selected_option')
+    def validate_option(cls, v):
+        """Validate that selected_option is not empty or whitespace."""
+        if not v or v.strip() == '':
+            raise ValueError('selected_option cannot be empty')
+        return v.strip()
 
 
 class StartQuizRequest(BaseModel):
@@ -74,9 +87,19 @@ async def get_quiz_state(
         # Determine question type and format accordingly
         qtype = QuestionType(question.question_type)
 
-        # Get the correct answer and reconstruct options
-        # Note: We need to regenerate options since we don't store them
-        from app.services.quiz_generator import generate_distractors, format_question
+        # Use saved options from database to maintain consistency
+        saved_options = [
+            question.option_1,
+            question.option_2,
+            question.option_3,
+            question.option_4
+        ]
+        # Filter out None values
+        options = [opt for opt in saved_options if opt is not None]
+
+        # Reconstruct prompt and display using format_question logic
+        from app.services.quiz_generator import format_question, generate_distractors
+        # We still need distractors for format_question, but we'll override options
         distractors = generate_distractors(db, letter, count=3)
         formatted = format_question(letter, qtype, distractors)
 
@@ -85,7 +108,7 @@ async def get_quiz_state(
             "question_number": i + 1,
             "prompt": formatted["prompt"],
             "display_letter": formatted["display_letter"],
-            "options": formatted["options"],
+            "options": options,  # Use saved options instead of regenerated ones
             "correct_answer": formatted["correct_answer"],
             "letter_name": letter.name,
             "audio_file": formatted.get("audio_file"),
@@ -154,61 +177,91 @@ async def submit_answer(
     """
     user_id = get_user_id_from_cookie(request)
 
-    # Verify quiz belongs to user
-    quiz = db.query(QuizAttempt).filter(QuizAttempt.id == quiz_id).first()
-    if not quiz or quiz.user_id != user_id:
-        raise HTTPException(status_code=404, detail="Quiz not found")
+    try:
+        # Verify quiz belongs to user
+        quiz = db.query(QuizAttempt).filter(QuizAttempt.id == quiz_id).first()
+        if not quiz or quiz.user_id != user_id:
+            raise HTTPException(status_code=404, detail="Quiz not found")
 
-    # Evaluate answer
-    result = evaluate_answer(db, answer.question_id, answer.selected_option)
+        # Verify quiz is not already completed
+        if quiz.completed_at is not None:
+            raise HTTPException(status_code=400, detail="Quiz already completed")
 
-    # Update quiz correct count
-    if result["is_correct"]:
-        quiz.correct_count += 1
+        # Check if question was already answered (prevents race condition)
+        question = db.query(QuizQuestion).filter(QuizQuestion.id == answer.question_id).first()
+        if not question:
+            raise HTTPException(status_code=404, detail="Question not found")
 
-    # Update user letter stats
-    stat = db.query(UserLetterStat).filter(
-        UserLetterStat.user_id == user_id,
-        UserLetterStat.letter_id == result["letter_id"]
-    ).first()
+        if question.chosen_option is not None:
+            # Question already answered, return existing result
+            return {
+                "question_id": question.id,
+                "is_correct": question.is_correct == 1,
+                "correct_answer": question.correct_option,
+                "selected_answer": question.chosen_option,
+                "letter_id": question.letter_id,
+                "is_last_question": False,
+                "already_answered": True
+            }
 
-    if stat:
-        stat.last_seen_at = datetime.utcnow()
-        update_letter_stats(stat, result["is_correct"])
+        # Evaluate answer
+        result = evaluate_answer(db, answer.question_id, answer.selected_option)
 
-    # Flush changes so the current answer is counted
-    db.flush()
+        # Update quiz correct count
+        if result["is_correct"]:
+            quiz.correct_count += 1
 
-    # Check if this was the last question
-    answered_count = db.query(QuizQuestion).filter(
-        QuizQuestion.quiz_id == quiz_id,
-        QuizQuestion.chosen_option.isnot(None)
-    ).count()
+        # Update user letter stats
+        stat = db.query(UserLetterStat).filter(
+            UserLetterStat.user_id == user_id,
+            UserLetterStat.letter_id == result["letter_id"]
+        ).first()
 
-    is_last_question = answered_count >= quiz.question_count
+        if stat:
+            stat.last_seen_at = datetime.utcnow()
+            update_letter_stats(stat, result["is_correct"])
 
-    if is_last_question:
-        # Finalize quiz
-        quiz.completed_at = datetime.utcnow()
-        quiz.accuracy = quiz.correct_count / quiz.question_count
+        # Flush changes so the current answer is counted
+        db.flush()
+
+        # Check if this was the last question
+        answered_count = db.query(QuizQuestion).filter(
+            QuizQuestion.quiz_id == quiz_id,
+            QuizQuestion.chosen_option.isnot(None)
+        ).count()
+
+        is_last_question = answered_count >= quiz.question_count
+
+        if is_last_question:
+            # Finalize quiz
+            quiz.completed_at = datetime.utcnow()
+            quiz.accuracy = quiz.correct_count / quiz.question_count
+
+            db.commit()
+
+            # Generate summary
+            summary = generate_quiz_summary(db, quiz, user_id)
+
+            return {
+                **result,
+                "is_last_question": True,
+                "summary": summary
+            }
 
         db.commit()
 
-        # Generate summary
-        summary = generate_quiz_summary(db, quiz, user_id)
-
         return {
             **result,
-            "is_last_question": True,
-            "summary": summary
+            "is_last_question": False
         }
 
-    db.commit()
-
-    return {
-        **result,
-        "is_last_question": False
-    }
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Rollback transaction on any error
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error submitting answer: {str(e)}")
 
 
 def generate_quiz_summary(db: Session, quiz: QuizAttempt, user_id: str) -> Dict:
@@ -223,12 +276,15 @@ def generate_quiz_summary(db: Session, quiz: QuizAttempt, user_id: str) -> Dict:
     Returns:
         Dictionary with quiz summary data
     """
-    # Get questions with letter info
-    questions_with_letters = db.query(QuizQuestion, Letter).join(
-        Letter, QuizQuestion.letter_id == Letter.id
+    # Get questions with letter info using eager loading to avoid N+1 queries
+    questions = db.query(QuizQuestion).options(
+        joinedload(QuizQuestion.letter)
     ).filter(
         QuizQuestion.quiz_id == quiz.id
     ).all()
+
+    # Extract letter objects for easier access
+    questions_with_letters = [(q, q.letter) for q in questions]
 
     # Analyze performance by letter
     letter_performance = {}
@@ -247,17 +303,17 @@ def generate_quiz_summary(db: Session, quiz: QuizAttempt, user_id: str) -> Dict:
     weak_letters = []
 
     for letter_name, perf in letter_performance.items():
-        if perf["total"] >= 2:  # Only consider letters seen multiple times
+        if perf["total"] >= MIN_LETTER_OCCURRENCES_IN_QUIZ:
             if perf["correct"] == perf["total"]:
                 strong_letters.append(letter_name)
             elif perf["correct"] == 0:
                 weak_letters.append(letter_name)
 
-    # Get last 10 quiz scores
+    # Get last N quiz scores
     recent_quizzes = db.query(QuizAttempt).filter(
         QuizAttempt.user_id == user_id,
         QuizAttempt.completed_at.isnot(None)
-    ).order_by(desc(QuizAttempt.completed_at)).limit(10).all()
+    ).order_by(desc(QuizAttempt.completed_at)).limit(RECENT_QUIZ_HISTORY_LIMIT).all()
 
     quiz_history = [
         {
@@ -273,9 +329,9 @@ def generate_quiz_summary(db: Session, quiz: QuizAttempt, user_id: str) -> Dict:
         Letter, UserLetterStat.letter_id == Letter.id
     ).filter(
         UserLetterStat.user_id == user_id,
-        UserLetterStat.seen_count >= 3,
-        UserLetterStat.mastery_score < 0.5
-    ).order_by(UserLetterStat.mastery_score).limit(5).all()
+        UserLetterStat.seen_count >= MIN_ATTEMPTS_FOR_WEAK_IDENTIFICATION,
+        UserLetterStat.mastery_score < WEAK_LETTER_THRESHOLD
+    ).order_by(UserLetterStat.mastery_score).limit(WEAK_LETTERS_SUMMARY_COUNT).all()
 
     overall_weak_letters = [
         {
