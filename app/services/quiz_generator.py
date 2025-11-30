@@ -190,6 +190,10 @@ def create_quiz(
     selected_letters = select_letters_for_quiz(db, user_id, count=14)
     question_types = generate_question_types(count=14, include_audio=include_audio)
 
+    # Shuffle selected_letters to ensure random pairing with question types
+    # (both lists are independently randomized, but zip creates deterministic pairing)
+    random.shuffle(selected_letters)
+
     formatted_questions = []
 
     for i, (letter, qtype) in enumerate(zip(selected_letters, question_types)):
