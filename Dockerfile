@@ -25,11 +25,11 @@ COPY tests/ ./tests/
 # Replace version placeholder in template
 RUN sed -i "s/__VERSION__/${VERSION}/g" /app/app/templates/base.html
 
-# Create directory for database
+# Create directory for database (will be mounted as volume in production)
 RUN mkdir -p /app/data
 
-# Initialize database
-RUN python -m app.db.init_db
+# Note: Database initialization happens automatically on first startup
+# via the auto-migration system in app/db/init_db.py
 
 # Expose port
 EXPOSE 8000
