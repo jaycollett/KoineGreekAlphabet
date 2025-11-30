@@ -33,6 +33,34 @@ function displaySummary() {
         feedbackMessage.className = 'text-lg text-yellow-400';
     }
 
+    // Display trend indicator
+    if (summary.trend) {
+        document.getElementById('trend-section').classList.remove('hidden');
+        const trendIndicator = document.getElementById('trend-indicator');
+        const trendText = document.getElementById('trend-text');
+        const trendDetails = document.getElementById('trend-details');
+
+        if (summary.trend.trend === 'up') {
+            trendIndicator.textContent = '↑';
+            trendIndicator.className = 'text-4xl font-bold text-green-400';
+            trendText.textContent = 'Improving!';
+            trendText.className = 'text-lg text-green-400 font-semibold';
+            trendDetails.textContent = `${Math.abs(summary.trend.change_percent)}% above recent average (${summary.trend.recent_average}%)`;
+        } else if (summary.trend.trend === 'down') {
+            trendIndicator.textContent = '↓';
+            trendIndicator.className = 'text-4xl font-bold text-yellow-400';
+            trendText.textContent = 'Keep practicing';
+            trendText.className = 'text-lg text-yellow-400 font-semibold';
+            trendDetails.textContent = `${Math.abs(summary.trend.change_percent)}% below recent average (${summary.trend.recent_average}%)`;
+        } else {
+            trendIndicator.textContent = '→';
+            trendIndicator.className = 'text-4xl font-bold text-blue-400';
+            trendText.textContent = 'Stable';
+            trendText.className = 'text-lg text-blue-400 font-semibold';
+            trendDetails.textContent = `Consistent with recent average (${summary.trend.recent_average}%)`;
+        }
+    }
+
     // Strong letters
     if (summary.strong_letters && summary.strong_letters.length > 0) {
         document.getElementById('strong-section').classList.remove('hidden');

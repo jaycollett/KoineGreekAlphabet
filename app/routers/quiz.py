@@ -264,6 +264,51 @@ async def submit_answer(
         raise HTTPException(status_code=500, detail=f"Error submitting answer: {str(e)}")
 
 
+def calculate_trend(db: Session, user_id: str, current_quiz_id: int, current_accuracy: float) -> Dict:
+    """
+    Calculate performance trend compared to recent quizzes.
+
+    Args:
+        db: Database session
+        user_id: User UUID
+        current_quiz_id: ID of the current quiz (to exclude it)
+        current_accuracy: Accuracy of current quiz (0.0-1.0)
+
+    Returns:
+        Dictionary with trend data: {"trend": "up"|"stable"|"down", "change_percent": float}
+        Returns None if insufficient data (< 3 previous quizzes)
+    """
+    # Get last 3 completed quizzes (excluding current)
+    previous_quizzes = db.query(QuizAttempt).filter(
+        QuizAttempt.user_id == user_id,
+        QuizAttempt.completed_at.isnot(None),
+        QuizAttempt.id != current_quiz_id
+    ).order_by(desc(QuizAttempt.completed_at)).limit(3).all()
+
+    if len(previous_quizzes) < 3:
+        return None
+
+    # Calculate average accuracy of previous 3 quizzes
+    avg_accuracy = sum(q.accuracy for q in previous_quizzes) / len(previous_quizzes)
+
+    # Calculate percentage difference
+    change_percent = (current_accuracy - avg_accuracy) * 100
+
+    # Determine trend (threshold of 5%)
+    if change_percent >= 5.0:
+        trend = "up"
+    elif change_percent <= -5.0:
+        trend = "down"
+    else:
+        trend = "stable"
+
+    return {
+        "trend": trend,
+        "change_percent": round(change_percent, 1),
+        "recent_average": round(avg_accuracy * 100, 1)
+    }
+
+
 def generate_quiz_summary(db: Session, quiz: QuizAttempt, user_id: str) -> Dict:
     """
     Generate summary for completed quiz.
@@ -342,6 +387,9 @@ def generate_quiz_summary(db: Session, quiz: QuizAttempt, user_id: str) -> Dict:
         for stat, letter in weak_stats
     ]
 
+    # Calculate performance trend
+    trend_data = calculate_trend(db, user_id, quiz.id, quiz.accuracy)
+
     return {
         "quiz_id": quiz.id,
         "correct_count": quiz.correct_count,
@@ -351,5 +399,6 @@ def generate_quiz_summary(db: Session, quiz: QuizAttempt, user_id: str) -> Dict:
         "strong_letters": strong_letters,
         "weak_letters": weak_letters,
         "quiz_history": quiz_history,
-        "overall_weak_letters": overall_weak_letters
+        "overall_weak_letters": overall_weak_letters,
+        "trend": trend_data
     }

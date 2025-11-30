@@ -80,16 +80,185 @@
                 font-size: 1.75rem;
             }
         }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            animation: fadeIn 0.2s ease-in-out;
+        }
+
+        .modal-overlay.hidden {
+            display: none;
+        }
+
+        .modal-container {
+            width: 100%;
+            max-width: 42rem;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        .modal-content {
+            background-color: #1e293b;
+            border-radius: 1rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid #334155;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem;
+            border-bottom: 1px solid #334155;
+        }
+
+        .modal-close-btn {
+            background-color: #334155;
+            color: #cbd5e1;
+            border-radius: 9999px;
+            width: 2.5rem;
+            height: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .modal-close-btn:hover {
+            background-color: #475569;
+            color: #ffffff;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            color: #e2e8f0;
+        }
+
+        .modal-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .modal-section-title {
+            display: flex;
+            align-items: center;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 0.75rem;
+        }
+
+        .modal-icon {
+            width: 1.5rem;
+            height: 1.5rem;
+            margin-right: 0.5rem;
+            flex-shrink: 0;
+        }
+
+        .modal-text {
+            color: #cbd5e1;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        .modal-text-sm {
+            color: #cbd5e1;
+            line-height: 1.5;
+            font-size: 0.875rem;
+        }
+
+        .modal-footer {
+            padding: 1.5rem;
+            border-top: 1px solid #334155;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(2rem);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Mobile-specific modal adjustments */
+        @media (max-width: 768px) {
+            .modal-container {
+                max-height: 95vh;
+            }
+
+            .modal-header {
+                padding: 1.25rem;
+            }
+
+            .modal-body {
+                padding: 1.25rem;
+            }
+
+            .modal-footer {
+                padding: 1.25rem;
+            }
+
+            .modal-section-title {
+                font-size: 1.1rem;
+            }
+        }
+
+        /* Prevent body scroll when modal is open */
+        body.modal-open {
+            overflow: hidden;
+        }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body class="bg-slate-900 min-h-screen">
     <div class="container mx-auto px-4 py-4 md:py-6 max-w-3xl">
-        <header class="text-center mb-4 md:mb-8">
+        <header class="text-center mb-4 md:mb-8 relative">
             <h1 class="text-2xl md:text-4xl font-bold text-blue-400 mb-1 md:mb-2">
                 Greek Alphabet Mastery
             </h1>
             <p class="text-gray-400 hidden md:block">Master all 24 Greek letters</p>
+
+            <!-- How It Works Button -->
+            <button
+                onclick="openHowItWorksModal()"
+                class="absolute right-0 top-0 bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white rounded-full w-10 h-10 flex items-center justify-center transition duration-200 border border-slate-600 hover:border-blue-500"
+                aria-label="How It Works"
+                title="How It Works"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </button>
         </header>
 
         <main>
@@ -98,6 +267,12 @@
 
         <footer class="mt-12 text-center text-sm text-gray-500 space-y-1">
             <p>Practice makes perfect</p>
+            <p class="flex items-center justify-center gap-1" title="Your progress is stored locally in this browser using cookies. Use future Export/Import features to transfer between devices.">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span class="text-gray-400">Progress saved in this browser</span>
+            </p>
             <p>
                 <a href="https://github.com/jaycollett/KoineGreekAlphabet" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-gray-200 transition duration-200">
                     v__VERSION__ · Developed by Jay Collett
@@ -105,6 +280,155 @@
             </p>
         </footer>
     </div>
+
+    <!-- How It Works Modal -->
+    <div id="how-it-works-modal" class="modal-overlay hidden">
+        <div class="modal-container">
+            <div class="modal-content">
+                <!-- Modal Header -->
+                <div class="modal-header">
+                    <h2 class="text-2xl md:text-3xl font-bold text-blue-400">How It Works</h2>
+                    <button
+                        onclick="closeHowItWorksModal()"
+                        class="modal-close-btn"
+                        aria-label="Close modal"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="modal-body">
+                    <!-- Adaptive Learning -->
+                    <section class="modal-section">
+                        <h3 class="modal-section-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="modal-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Your Progress is Adaptive
+                        </h3>
+                        <p class="modal-text">
+                            After 10 quizzes, the app intelligently focuses on your weak spots.
+                            60% of questions target letters you struggle with, while 40% cover
+                            all letters for retention and balanced practice.
+                        </p>
+                    </section>
+
+                    <!-- Mastery Levels -->
+                    <section class="modal-section">
+                        <h3 class="modal-section-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="modal-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                            </svg>
+                            Mastery Levels
+                        </h3>
+                        <div class="space-y-3">
+                            <div>
+                                <h4 class="font-semibold text-green-400 mb-1">Strong Letters</h4>
+                                <p class="modal-text-sm">
+                                    High accuracy (90%+) with consistent correct streaks. You've mastered these!
+                                </p>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-yellow-400 mb-1">Learning</h4>
+                                <p class="modal-text-sm">
+                                    You've seen these letters but haven't mastered them yet. Keep practicing!
+                                </p>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-red-400 mb-1">Practice Needed</h4>
+                                <p class="modal-text-sm">
+                                    Letters you've struggled with recently. These will appear more often.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Accuracy Calculation -->
+                    <section class="modal-section">
+                        <h3 class="modal-section-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="modal-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            How Accuracy is Calculated
+                        </h3>
+                        <p class="modal-text">
+                            Your mastery score combines overall accuracy, current correct streak,
+                            and consistency over time. Regular practice improves retention and builds
+                            lasting recognition.
+                        </p>
+                    </section>
+
+                    <!-- Question Types -->
+                    <section class="modal-section">
+                        <h3 class="modal-section-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="modal-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Question Types
+                        </h3>
+                        <ul class="space-y-2 ml-1">
+                            <li class="modal-text-sm flex items-start">
+                                <span class="text-blue-400 mr-2">•</span>
+                                <span><strong>Letter → Name:</strong> Identify the Greek letter name</span>
+                            </li>
+                            <li class="modal-text-sm flex items-start">
+                                <span class="text-blue-400 mr-2">•</span>
+                                <span><strong>Name → Uppercase:</strong> Recognize the uppercase form</span>
+                            </li>
+                            <li class="modal-text-sm flex items-start">
+                                <span class="text-blue-400 mr-2">•</span>
+                                <span><strong>Name → Lowercase:</strong> Recognize the lowercase form</span>
+                            </li>
+                            <li class="modal-text-sm flex items-start">
+                                <span class="text-blue-400 mr-2">•</span>
+                                <span><strong>Audio → Uppercase:</strong> Listen and identify the uppercase letter</span>
+                            </li>
+                            <li class="modal-text-sm flex items-start">
+                                <span class="text-blue-400 mr-2">•</span>
+                                <span><strong>Audio → Lowercase:</strong> Listen and identify the lowercase letter</span>
+                            </li>
+                        </ul>
+                    </section>
+
+                    <!-- Practice Recommendations -->
+                    <section class="modal-section border-t border-slate-700 pt-6 mt-6">
+                        <h3 class="modal-section-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="modal-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Practice Recommendations
+                        </h3>
+                        <div class="space-y-2">
+                            <p class="modal-text-sm flex items-start">
+                                <span class="text-green-400 font-bold mr-2">Daily:</span>
+                                <span>1-2 quizzes (14-28 questions) for steady progress</span>
+                            </p>
+                            <p class="modal-text-sm flex items-start">
+                                <span class="text-blue-400 font-bold mr-2">Weekly:</span>
+                                <span>5-10 quizzes to see measurable improvement</span>
+                            </p>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="modal-footer">
+                    <button
+                        onclick="closeHowItWorksModal()"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200"
+                    >
+                        Got it!
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load shared utilities on all pages -->
+    <script src="/static/js/app.js"></script>
 
     {% block scripts %}{% endblock %}
 </body>
