@@ -161,6 +161,8 @@
     function toggleAudioQuestions() {
         const toggle = document.getElementById('audio-toggle');
         localStorage.setItem('includeAudioQuestions', toggle.checked);
+        // Clear any saved quiz so the new preference takes effect immediately
+        sessionStorage.removeItem('currentQuizId');
     }
 
     function loadAudioPreference() {
