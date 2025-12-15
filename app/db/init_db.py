@@ -148,6 +148,57 @@ def apply_schema_migrations(db: Session) -> None:
             except OperationalError as e:
                 logger.warning(f"Could not create index idx_quiz_correct: {e}")
 
+    # Migration 5: Add difficulty progression columns to users table
+    if 'users' in existing_tables:
+        difficulty_columns = [
+            ('current_level', 'INTEGER NOT NULL DEFAULT 1'),
+            ('consecutive_perfect_streak', 'INTEGER NOT NULL DEFAULT 0'),
+            ('level_up_count', 'INTEGER NOT NULL DEFAULT 0')
+        ]
+
+        for col_name, col_def in difficulty_columns:
+            if not check_column_exists(inspector, 'users', col_name):
+                try:
+                    logger.info(f"Adding column {col_name} to users table...")
+                    db.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}"))
+                    migrations_applied.append(f"Added column users.{col_name}")
+                except OperationalError as e:
+                    logger.warning(f"Could not add column {col_name}: {e}")
+
+    # Migration 6: Create level_progressions table
+    if 'level_progressions' not in existing_tables:
+        try:
+            logger.info("Creating level_progressions table...")
+            db.execute(text("""
+                CREATE TABLE level_progressions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    from_level INTEGER NOT NULL,
+                    to_level INTEGER NOT NULL,
+                    achieved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    perfect_streak_count INTEGER NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    CHECK (from_level >= 1 AND from_level <= 3),
+                    CHECK (to_level >= 1 AND to_level <= 3),
+                    CHECK (to_level = from_level + 1)
+                )
+            """))
+            migrations_applied.append("Created table level_progressions")
+        except OperationalError as e:
+            logger.warning(f"Could not create table level_progressions: {e}")
+
+    # Migration 7: Add index to level_progressions
+    if 'level_progressions' in existing_tables or 'level_progressions' not in existing_tables:
+        # Check again after potential creation
+        if 'level_progressions' in inspector.get_table_names():
+            if not check_index_exists(inspector, 'level_progressions', 'idx_level_progressions_user'):
+                try:
+                    logger.info("Creating index idx_level_progressions_user...")
+                    db.execute(text('CREATE INDEX IF NOT EXISTS idx_level_progressions_user ON level_progressions (user_id, achieved_at DESC)'))
+                    migrations_applied.append("Created index idx_level_progressions_user")
+                except OperationalError as e:
+                    logger.warning(f"Could not create index idx_level_progressions_user: {e}")
+
     # Commit all migrations
     if migrations_applied:
         try:
