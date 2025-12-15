@@ -173,8 +173,29 @@ def select_letter_adaptive(
             weakness_weights.append(1.0)
 
     # If force_weak or we're in the 60% quota, select from weak letters
-    if force_weak and weak_letters:
-        return random.choices(weak_letters, weights=weakness_weights, k=1)[0]
+    if force_weak:
+        if weak_letters:
+            # Check if all weights are zero (can happen when all weak letters have mastery_score = 1.0)
+            if sum(weakness_weights) > 0:
+                return random.choices(weak_letters, weights=weakness_weights, k=1)[0]
+            else:
+                # Fallback: use equal weights when all weakness scores are zero
+                return random.choice(weak_letters)
+
+        # No weak letters available (all filtered by recent_selections)
+        # Fallback: try to get any non-mastered letter even if recent
+        for letter in all_letters:
+            stat = stats_map.get(letter.id)
+            if stat:
+                state = get_mastery_state(stat.seen_count, stat.correct_count, stat.current_streak)
+                if state != MasteryState.MASTERED:
+                    return letter
+            else:
+                # Unseen letter is weak
+                return letter
+
+        # Ultimate fallback: return any letter (all are mastered)
+        return random.choice(all_letters)
 
     # For the 40% quota, select from all eligible letters
     all_eligible = weak_letters + mastered_letters
