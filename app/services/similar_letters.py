@@ -87,7 +87,7 @@ def get_similar_letters(
 
         # Remove the target itself and letters we already have
         extended_similar.discard(target_letter.name)
-        extended_similar -= similar_names
+        extended_similar = extended_similar - set(similar_names)
 
         # Find Letter objects for extended similar set
         extended_letters = [

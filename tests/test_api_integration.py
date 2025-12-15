@@ -1,35 +1,42 @@
 """Integration tests for API endpoints."""
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.db.database import Base, get_db
-from app.db.models import Letter, User, UserLetterStat, QuizAttempt, QuizQuestion
+from app.db.models import Letter, User, UserLetterStat, QuizAttempt, QuizQuestion, LevelProgression
 from app.db.init_db import GREEK_ALPHABET
+
+# Create test database at module level
+SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=None
+)
+TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+
+def override_get_db():
+    """Override database dependency for testing."""
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# Override dependency at module level BEFORE any TestClient is created
+app.dependency_overrides[get_db] = override_get_db
 
 
 @pytest.fixture(scope="function")
 def test_client():
     """Create a test client with in-memory database."""
-    # Create test database with thread-safety disabled for testing
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=None
-    )
+    # Create all tables
     Base.metadata.create_all(engine)
-    TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-
-    # Override dependency
-    def override_get_db():
-        db = TestingSessionLocal()
-        try:
-            yield db
-        finally:
-            db.close()
-
-    app.dependency_overrides[get_db] = override_get_db
 
     # Seed Greek alphabet
     db = TestingSessionLocal()
@@ -39,13 +46,14 @@ def test_client():
     db.commit()
     db.close()
 
-    # Create test client
-    client = TestClient(app)
+    # Mock init_db to prevent it from running during TestClient initialization
+    with patch('app.main.init_db'):
+        # Create test client
+        client = TestClient(app)
+        yield client
 
-    yield client
-
-    # Cleanup
-    app.dependency_overrides.clear()
+    # Cleanup tables
+    Base.metadata.drop_all(engine)
 
 
 class TestBootstrapEndpoint:

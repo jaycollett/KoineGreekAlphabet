@@ -95,8 +95,8 @@ def select_letter_balanced(
     eligible_letters = []
 
     for letter in all_letters:
-        # Reduce weight if recently selected
-        if letter.id in recent_selections[-RECENT_SELECTION_WINDOW:]:
+        # Skip if already selected in this quiz (database has UNIQUE constraint)
+        if letter.id in recent_selections:
             continue
 
         stat = stats_map.get(letter.id)
@@ -148,8 +148,8 @@ def select_letter_adaptive(
     weakness_weights = []
 
     for letter in all_letters:
-        # Reduce weight if recently selected
-        if letter.id in recent_selections[-RECENT_SELECTION_WINDOW:]:
+        # Skip if already selected in this quiz (database has UNIQUE constraint)
+        if letter.id in recent_selections:
             continue
 
         stat = stats_map.get(letter.id)

@@ -218,7 +218,7 @@ class TestGenerateDistractors:
             use_similar=True
         )
 
-        assert len(distractors) == 2
+        assert len(distractors) == 3  # Level 3 now uses 3 distractors (4 total options)
         assert pi not in distractors
 
     def test_distractors_do_not_include_correct_letter(self, test_db):
@@ -303,7 +303,7 @@ class TestCreateQuizWithLevels:
             assert len(options) == 4
 
     def test_level_3_user_gets_level_3_mechanics(self, test_db):
-        """Level 3 user should get 80% audio, 2 similar distractors."""
+        """Level 3 user should get 90% audio, 3 similar distractors (4 total options)."""
         user = User(id="test-level3-user", current_level=3)
         test_db.add(user)
         test_db.commit()
@@ -318,10 +318,10 @@ class TestCreateQuizWithLevels:
         expected_audio = int(QUESTIONS_PER_QUIZ * LEVEL_3_AUDIO_RATIO)
         assert abs(audio_count - expected_audio) <= 1
 
-        # Verify 3 options per question (2 distractors + 1 correct)
+        # Verify 4 options per question (3 distractors + 1 correct, all similar letters)
         for question in questions:
             options = question.get("options", [])
-            assert len(options) == 3
+            assert len(options) == 4
 
     def test_quiz_stores_correct_question_count(self, test_db):
         """Quiz should always have QUESTIONS_PER_QUIZ questions."""
