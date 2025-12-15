@@ -204,26 +204,34 @@
         levelDescription.textContent = levelInfo.description.split(':')[0]; // Extract just "Beginner", "Intermediate", etc.
 
         // Display progress
-        const progress = levelProgress.progress_to_next;
+        const progress = levelProgress.progress_percentage || 0;
         progressPercent.textContent = `${Math.round(progress)}%`;
         progressFill.style.width = `${progress}%`;
 
         // Update progress bar ARIA attributes
-        progressBar.setAttribute('aria-valuenow', levelProgress.consecutive_perfect_streak);
+        progressBar.setAttribute('aria-valuenow', levelProgress.perfect_streak || 0);
+        progressBar.setAttribute('aria-valuemax', levelProgress.required_streak || 5);
         progressBar.setAttribute('aria-label',
-            `Level progress: ${levelProgress.consecutive_perfect_streak} out of 10 perfect quizzes`);
+            `Level progress: ${levelProgress.perfect_streak || 0} out of ${levelProgress.required_streak || 5} perfect quizzes`);
 
         // Helper text
-        if (levelProgress.current_level === 3 && progress === 100) {
+        const requiredStreak = levelProgress.required_streak || 5;
+        const currentStreak = levelProgress.perfect_streak || 0;
+        const remaining = requiredStreak - currentStreak;
+
+        if (!levelProgress.can_level_up) {
             helperText.innerHTML = '<span class="text-yellow-400 font-semibold">MAX LEVEL ACHIEVED!</span>';
+        } else if (remaining <= 0) {
+            helperText.textContent = 'Ready to level up on next perfect quiz!';
+        } else if (remaining === 1) {
+            helperText.textContent = '1 more perfect quiz to level up';
         } else {
-            helperText.textContent = levelProgress.next_level_requirements ||
-                `${10 - levelProgress.consecutive_perfect_streak} more perfect quizzes to level up`;
+            helperText.textContent = `${remaining} more perfect quizzes to level up`;
         }
 
         // Trend indicator (optional - shows if improving)
-        if (levelProgress.consecutive_perfect_streak > 0) {
-            trendIndicator.innerHTML = `<span class="level-trend-up">↗ ${levelProgress.consecutive_perfect_streak}/10</span>`;
+        if (currentStreak > 0) {
+            trendIndicator.innerHTML = `<span class="level-trend-up">↗ ${currentStreak}/${requiredStreak}</span>`;
             trendIndicator.classList.remove('hidden');
         } else {
             trendIndicator.classList.add('hidden');
