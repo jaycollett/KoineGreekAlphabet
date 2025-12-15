@@ -93,8 +93,8 @@ class TestCheckAndUpdateLevel:
         assert user.current_level == 1
 
     def test_level_up_from_1_to_2_at_10_streak(self, test_db):
-        """User should level up from 1 to 2 after 10 perfect quizzes."""
-        user = User(id="test-user-3", current_level=1, consecutive_perfect_streak=9)
+        """User should level up from 1 to 2 after 5 perfect quizzes."""
+        user = User(id="test-user-3", current_level=1, consecutive_perfect_streak=4)
         test_db.add(user)
 
         quiz = QuizAttempt(
@@ -129,11 +129,11 @@ class TestCheckAndUpdateLevel:
         assert progression.perfect_streak_count == PERFECT_STREAK_FOR_LEVEL_UP
 
     def test_level_up_from_2_to_3(self, test_db):
-        """User should level up from 2 to 3 after 10 perfect quizzes."""
+        """User should level up from 2 to 3 after 5 perfect quizzes."""
         user = User(
             id="test-user-4",
             current_level=2,
-            consecutive_perfect_streak=9,
+            consecutive_perfect_streak=4,
             level_up_count=1
         )
         test_db.add(user)
@@ -312,27 +312,27 @@ class TestGetLevelProgress:
         assert progress["progress_percentage"] == 0.0
 
     def test_progress_at_level_1_with_5_streak(self, test_db):
-        """User at level 1 with 5 streak should have 50% progress."""
-        user = User(id="test-progress-2", current_level=1, consecutive_perfect_streak=5)
+        """User at level 1 with 2 streak should have 40% progress."""
+        user = User(id="test-progress-2", current_level=1, consecutive_perfect_streak=2)
         test_db.add(user)
         test_db.commit()
 
         progress = get_level_progress(user)
 
         assert progress["current_level"] == 1
-        assert progress["perfect_streak"] == 5
-        assert progress["progress_percentage"] == 50.0
+        assert progress["perfect_streak"] == 2
+        assert progress["progress_percentage"] == 40.0
 
     def test_progress_at_level_2_with_8_streak(self, test_db):
-        """User at level 2 with 8 streak should have 80% progress."""
-        user = User(id="test-progress-3", current_level=2, consecutive_perfect_streak=8)
+        """User at level 2 with 4 streak should have 80% progress."""
+        user = User(id="test-progress-3", current_level=2, consecutive_perfect_streak=4)
         test_db.add(user)
         test_db.commit()
 
         progress = get_level_progress(user)
 
         assert progress["current_level"] == 2
-        assert progress["perfect_streak"] == 8
+        assert progress["perfect_streak"] == 4
         assert progress["progress_percentage"] == 80.0
 
     def test_progress_at_level_3_cannot_level_up(self, test_db):
@@ -363,14 +363,14 @@ class TestGetLevelProgress:
 
     def test_progress_percentage_rounding(self, test_db):
         """Progress percentage should be rounded to 1 decimal place."""
-        user = User(id="test-progress-6", current_level=1, consecutive_perfect_streak=3)
+        user = User(id="test-progress-6", current_level=1, consecutive_perfect_streak=1)
         test_db.add(user)
         test_db.commit()
 
         progress = get_level_progress(user)
 
-        # 3/10 = 0.3 = 30.0%
-        assert progress["progress_percentage"] == 30.0
+        # 1/5 = 0.2 = 20.0%
+        assert progress["progress_percentage"] == 20.0
         assert isinstance(progress["progress_percentage"], float)
 
 
@@ -405,9 +405,9 @@ class TestGetLevelDescription:
 
         assert desc["level"] == 3
         assert desc["name"] == "Advanced"
-        assert desc["audio_ratio"] == 80
-        assert desc["distractor_count"] == 2
-        assert desc["distractor_type"] == "similar"
+        assert desc["audio_ratio"] == 90
+        assert desc["distractor_count"] == 3
+        assert desc["distractor_type"] == "extremely_similar"
         assert "description" in desc
 
     def test_invalid_level_returns_level_1(self):

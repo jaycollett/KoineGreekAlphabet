@@ -84,7 +84,7 @@ AUDIO_PATH_TEMPLATE = "/static/audio/{letter_name}.mp3"
 """Template for generating audio file paths. {letter_name} will be replaced with lowercase letter name."""
 
 # Difficulty Progression
-PERFECT_STREAK_FOR_LEVEL_UP = 10
+PERFECT_STREAK_FOR_LEVEL_UP = 5
 """Number of consecutive perfect quizzes (14/14) required to advance to next level."""
 
 LEVEL_1_AUDIO_RATIO = 0.4
@@ -93,8 +93,8 @@ LEVEL_1_AUDIO_RATIO = 0.4
 LEVEL_2_AUDIO_RATIO = 0.65
 """Proportion of audio questions in Level 2 (65%)."""
 
-LEVEL_3_AUDIO_RATIO = 0.8
-"""Proportion of audio questions in Level 3 (80%)."""
+LEVEL_3_AUDIO_RATIO = 0.90
+"""Proportion of audio questions in Level 3 (90%)."""
 
-LEVEL_3_DISTRACTOR_COUNT = 2
-"""Number of distractors in Level 3 (3 total options instead of 4)."""
+LEVEL_3_DISTRACTOR_COUNT = 3
+"""Number of distractors in Level 3 (4 total options, all extremely similar letters)."""

@@ -16,7 +16,7 @@ def check_and_update_level(
 
     Updates user's consecutive_perfect_streak and performs level-up if criteria met.
     Level-up criteria:
-    - 10 consecutive perfect quizzes (14/14 correct)
+    - 5 consecutive perfect quizzes (14/14 correct)
     - Current level < 3
 
     Args:
@@ -30,7 +30,7 @@ def check_and_update_level(
             "leveled_up": True,
             "from_level": 1,
             "to_level": 2,
-            "streak_count": 10
+            "streak_count": 5
         }
     """
     is_perfect = quiz.correct_count == QUESTIONS_PER_QUIZ
@@ -153,10 +153,10 @@ def get_level_description(level: int) -> Dict:
         3: {
             "level": 3,
             "name": "Advanced",
-            "audio_ratio": 80,
-            "distractor_count": 2,
-            "distractor_type": "similar",
-            "description": "Mostly audio questions with fewer, visually similar options"
+            "audio_ratio": 90,
+            "distractor_count": 3,
+            "distractor_type": "extremely_similar",
+            "description": "Primarily audio questions with all extremely confusing similar letter options"
         }
     }
 

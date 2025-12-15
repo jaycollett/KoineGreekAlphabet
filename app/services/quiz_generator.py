@@ -105,7 +105,8 @@ def generate_distractors(
     db: Session,
     correct_letter: Letter,
     count: int = 3,
-    use_similar: bool = False
+    use_similar: bool = False,
+    strict_similar: bool = False
 ) -> List[Letter]:
     """
     Generate distractor letters for multiple choice.
@@ -115,6 +116,7 @@ def generate_distractors(
         correct_letter: The correct answer letter
         count: Number of distractors needed (default 3)
         use_similar: If True, prefer visually/phonetically similar letters (Level 2/3)
+        strict_similar: If True, ONLY use extremely similar letters (Level 3)
 
     Returns:
         List of Letter objects (distractors only, not including correct)
@@ -122,7 +124,7 @@ def generate_distractors(
     if use_similar:
         # Level 2/3: Use similar letter selection
         all_letters = db.query(Letter).all()
-        distractors = get_similar_letters(correct_letter, all_letters, count)
+        distractors = get_similar_letters(correct_letter, all_letters, count, strict_mode=strict_similar)
     else:
         # Level 1: Random distractor selection
         distractors = db.query(Letter).filter(
@@ -226,9 +228,9 @@ def create_quiz(
     5. Format questions for frontend
 
     Difficulty mechanics:
-    - Level 1: 40% audio, 3 random distractors
-    - Level 2: 65% audio, 3 similar distractors
-    - Level 3: 80% audio, 2 similar distractors
+    - Level 1: 40% audio, 3 random distractors (4 total options)
+    - Level 2: 65% audio, 3 similar distractors (4 total options)
+    - Level 3: 90% audio, 3 EXTREMELY similar distractors (4 total options, all confusing)
 
     Args:
         db: Database session
@@ -248,14 +250,17 @@ def create_quiz(
         audio_ratio = LEVEL_1_AUDIO_RATIO
         distractor_count = DISTRACTOR_COUNT
         use_similar_distractors = False
+        strict_similar_distractors = False
     elif user.current_level == 2:
         audio_ratio = LEVEL_2_AUDIO_RATIO
         distractor_count = DISTRACTOR_COUNT
         use_similar_distractors = True
+        strict_similar_distractors = False
     else:  # Level 3
         audio_ratio = LEVEL_3_AUDIO_RATIO
         distractor_count = LEVEL_3_DISTRACTOR_COUNT
         use_similar_distractors = True
+        strict_similar_distractors = True
 
     # Create quiz attempt
     quiz = QuizAttempt(
@@ -286,7 +291,8 @@ def create_quiz(
             db,
             letter,
             count=distractor_count,
-            use_similar=use_similar_distractors
+            use_similar=use_similar_distractors,
+            strict_similar=strict_similar_distractors
         )
 
         # Format question for frontend
