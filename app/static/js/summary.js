@@ -14,6 +14,14 @@ function displaySummary() {
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('summary-content').classList.remove('hidden');
 
+    // Display level-up celebration if applicable
+    if (summary.leveled_up && summary.new_level) {
+        displayLevelUpCelebration(summary.new_level, summary.level_progress);
+    } else if (summary.level_progress) {
+        // Show level progress update if not leveled up
+        displayLevelProgress(summary.level_progress);
+    }
+
     // Display score
     document.getElementById('score-display').textContent =
         `${summary.correct_count}/${summary.question_count}`;
@@ -104,6 +112,66 @@ function displaySummary() {
             </div>
         `).join('');
     }
+}
+
+function displayLevelUpCelebration(newLevel, levelProgress) {
+    const banner = document.getElementById('level-up-banner');
+    const title = document.getElementById('level-up-title');
+    const message = document.getElementById('level-up-message');
+
+    // Level descriptions
+    const levelDescriptions = {
+        1: 'Beginner',
+        2: 'Intermediate',
+        3: 'Advanced'
+    };
+
+    title.textContent = 'Level Up!';
+
+    if (newLevel === 3) {
+        message.textContent = `You've reached Level ${newLevel} - ${levelDescriptions[newLevel]}! Maximum level achieved!`;
+    } else {
+        message.textContent = `You've reached Level ${newLevel} - ${levelDescriptions[newLevel]}!`;
+    }
+
+    banner.classList.remove('hidden');
+
+    // Auto-hide after 10 seconds (but keep in DOM for accessibility)
+    setTimeout(() => {
+        banner.style.animation = 'fadeOut 1s ease-out forwards';
+        setTimeout(() => {
+            banner.style.display = 'none';
+        }, 1000);
+    }, 10000);
+}
+
+function displayLevelProgress(levelProgress) {
+    const section = document.getElementById('level-progress-section');
+    const levelInfo = document.getElementById('level-progress-info');
+    const progressPercent = document.getElementById('level-progress-percent-summary');
+    const progressFill = document.getElementById('level-progress-fill-summary');
+    const helperText = document.getElementById('level-progress-helper-summary');
+
+    // Level descriptions
+    const levelDescriptions = {
+        1: 'Beginner',
+        2: 'Intermediate',
+        3: 'Advanced'
+    };
+
+    levelInfo.textContent = `Level ${levelProgress.current_level} - ${levelDescriptions[levelProgress.current_level]}`;
+    progressPercent.textContent = `${Math.round(levelProgress.progress_to_next)}%`;
+    progressFill.style.width = `${levelProgress.progress_to_next}%`;
+
+    if (levelProgress.current_level === 3 && levelProgress.progress_to_next === 100) {
+        helperText.innerHTML = '<span class="text-yellow-400 font-semibold">Max level achieved!</span>';
+    } else if (levelProgress.consecutive_perfect_streak > 0) {
+        helperText.textContent = `${levelProgress.consecutive_perfect_streak}/10 perfect quizzes - ${levelProgress.next_level_requirements}`;
+    } else {
+        helperText.textContent = levelProgress.next_level_requirements || 'Complete perfect quizzes to level up';
+    }
+
+    section.classList.remove('hidden');
 }
 
 function startNewQuiz() {

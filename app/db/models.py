@@ -13,9 +13,20 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     last_active_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    # Difficulty progression tracking
+    current_level = Column(Integer, CheckConstraint("current_level >= 1 AND current_level <= 3"), nullable=False, default=1)
+    consecutive_perfect_streak = Column(Integer, CheckConstraint("consecutive_perfect_streak >= 0"), nullable=False, default=0)
+    level_up_count = Column(Integer, CheckConstraint("level_up_count >= 0"), nullable=False, default=0)
+
+    # Index for analytics queries
+    __table_args__ = (
+        Index('idx_users_level', 'current_level'),
+    )
+
     # Relationships
     letter_stats = relationship("UserLetterStat", back_populates="user", cascade="all, delete-orphan")
     quiz_attempts = relationship("QuizAttempt", back_populates="user", cascade="all, delete-orphan")
+    level_progressions = relationship("LevelProgression", back_populates="user", cascade="all, delete-orphan")
 
 
 class Letter(Base):
@@ -108,3 +119,24 @@ class QuizQuestion(Base):
     # Relationships
     quiz = relationship("QuizAttempt", back_populates="questions")
     letter = relationship("Letter", back_populates="quiz_questions")
+
+
+class LevelProgression(Base):
+    """Historical tracking of user difficulty level advancements."""
+    __tablename__ = "level_progressions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Text, ForeignKey("users.id"), nullable=False)
+    from_level = Column(Integer, CheckConstraint("from_level >= 1 AND from_level <= 3"), nullable=False)
+    to_level = Column(Integer, CheckConstraint("to_level >= 1 AND to_level <= 3"), nullable=False)
+    achieved_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    perfect_streak_count = Column(Integer, nullable=False)  # Number of perfect quizzes that triggered level-up
+
+    # Constraints and indexes
+    __table_args__ = (
+        CheckConstraint("to_level = from_level + 1", name="ck_level_progression_increment"),
+        Index('idx_level_progressions_user', 'user_id', 'achieved_at'),
+    )
+
+    # Relationships
+    user = relationship("User", back_populates="level_progressions")

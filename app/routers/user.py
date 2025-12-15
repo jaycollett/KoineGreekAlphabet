@@ -8,6 +8,7 @@ from sqlalchemy import desc
 from app.db.database import get_db
 from app.db.models import User, UserLetterStat, Letter, QuizAttempt
 from app.services.mastery import get_mastery_state
+from app.services.level_progression import get_level_progress, get_level_description
 from app.config import settings
 
 router = APIRouter(prefix="/api", tags=["user"])
@@ -148,10 +149,20 @@ async def bootstrap(
     if quiz_history:
         avg_accuracy = sum(q["accuracy"] for q in quiz_history if q["accuracy"]) / len(quiz_history)
 
+    # Get user for level progression data
+    user = db.query(User).filter(User.id == user_id).first()
+    level_progress = None
+    current_level_info = None
+    if user:
+        level_progress = get_level_progress(user)
+        current_level_info = get_level_description(user.current_level)
+
     return {
         "user_id": user_id,
         "total_quizzes": total_quizzes,
         "average_accuracy": avg_accuracy,
         "quiz_history": quiz_history,
-        "mastery_summary": mastery_summary
+        "mastery_summary": mastery_summary,
+        "level_progress": level_progress,
+        "current_level_info": current_level_info
     }

@@ -4,9 +4,18 @@ from enum import Enum
 from typing import List, Dict, Tuple
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from app.db.models import Letter, QuizAttempt, QuizQuestion
+from app.db.models import Letter, QuizAttempt, QuizQuestion, User
 from app.services.adaptive import select_letters_for_quiz
-from app.constants import QUESTIONS_PER_QUIZ, DISTRACTOR_COUNT, AUDIO_PATH_TEMPLATE
+from app.services.similar_letters import get_similar_letters
+from app.constants import (
+    QUESTIONS_PER_QUIZ,
+    DISTRACTOR_COUNT,
+    AUDIO_PATH_TEMPLATE,
+    LEVEL_1_AUDIO_RATIO,
+    LEVEL_2_AUDIO_RATIO,
+    LEVEL_3_AUDIO_RATIO,
+    LEVEL_3_DISTRACTOR_COUNT
+)
 
 
 class QuestionType(str, Enum):
@@ -18,40 +27,74 @@ class QuestionType(str, Enum):
     AUDIO_TO_LOWER = "AUDIO_TO_LOWER"   # Play audio, ask for lowercase
 
 
-def generate_question_types(count: int = 14, include_audio: bool = True) -> List[QuestionType]:
+def generate_question_types(
+    count: int = 14,
+    include_audio: bool = True,
+    audio_ratio: float = 0.4
+) -> List[QuestionType]:
     """
-    Generate a mixed list of question types.
+    Generate a mixed list of question types based on difficulty level.
 
-    Strategy: Aim for roughly even distribution among all types.
+    Strategy: Control audio ratio based on difficulty level.
+    - Level 1: 40% audio
+    - Level 2: 65% audio
+    - Level 3: 80% audio
 
     Args:
         count: Number of questions (default 14)
         include_audio: Whether to include audio question types (default True)
+        audio_ratio: Proportion of audio questions (0.0-1.0)
 
     Returns:
         List of QuestionType values, shuffled
     """
-    types = [
+    if not include_audio or audio_ratio == 0:
+        # No audio - use only visual types
+        visual_types = [
+            QuestionType.LETTER_TO_NAME,
+            QuestionType.NAME_TO_UPPER,
+            QuestionType.NAME_TO_LOWER
+        ]
+        # Distribute evenly
+        per_type = count // len(visual_types)
+        remainder = count % len(visual_types)
+        question_types = []
+        for i, qtype in enumerate(visual_types):
+            type_count = per_type + (1 if i < remainder else 0)
+            question_types.extend([qtype] * type_count)
+        random.shuffle(question_types)
+        return question_types
+
+    # Calculate audio vs visual question counts
+    audio_count = int(count * audio_ratio)
+    visual_count = count - audio_count
+
+    question_types = []
+
+    # Add visual questions
+    visual_types = [
         QuestionType.LETTER_TO_NAME,
         QuestionType.NAME_TO_UPPER,
         QuestionType.NAME_TO_LOWER
     ]
+    if visual_count > 0:
+        per_visual = visual_count // len(visual_types)
+        remainder_visual = visual_count % len(visual_types)
+        for i, qtype in enumerate(visual_types):
+            type_count = per_visual + (1 if i < remainder_visual else 0)
+            question_types.extend([qtype] * type_count)
 
-    if include_audio:
-        types.extend([
-            QuestionType.AUDIO_TO_UPPER,
-            QuestionType.AUDIO_TO_LOWER
-        ])
-
-    # Create roughly equal distribution
-    per_type = count // len(types)
-    remainder = count % len(types)
-
-    question_types = []
-    for i, qtype in enumerate(types):
-        # Add remainder to first few types
-        type_count = per_type + (1 if i < remainder else 0)
-        question_types.extend([qtype] * type_count)
+    # Add audio questions
+    audio_types = [
+        QuestionType.AUDIO_TO_UPPER,
+        QuestionType.AUDIO_TO_LOWER
+    ]
+    if audio_count > 0:
+        per_audio = audio_count // len(audio_types)
+        remainder_audio = audio_count % len(audio_types)
+        for i, qtype in enumerate(audio_types):
+            type_count = per_audio + (1 if i < remainder_audio else 0)
+            question_types.extend([qtype] * type_count)
 
     # Shuffle to avoid clustering
     random.shuffle(question_types)
@@ -61,25 +104,30 @@ def generate_question_types(count: int = 14, include_audio: bool = True) -> List
 def generate_distractors(
     db: Session,
     correct_letter: Letter,
-    count: int = 3
+    count: int = 3,
+    use_similar: bool = False
 ) -> List[Letter]:
     """
-    Generate distractor letters for multiple choice using SQL-level random sampling.
-
-    This approach is more efficient than loading all letters and sampling in Python.
+    Generate distractor letters for multiple choice.
 
     Args:
         db: Database session
         correct_letter: The correct answer letter
         count: Number of distractors needed (default 3)
+        use_similar: If True, prefer visually/phonetically similar letters (Level 2/3)
 
     Returns:
         List of Letter objects (distractors only, not including correct)
     """
-    # Use SQL-level random sampling for better performance
-    distractors = db.query(Letter).filter(
-        Letter.id != correct_letter.id
-    ).order_by(func.random()).limit(count).all()
+    if use_similar:
+        # Level 2/3: Use similar letter selection
+        all_letters = db.query(Letter).all()
+        distractors = get_similar_letters(correct_letter, all_letters, count)
+    else:
+        # Level 1: Random distractor selection
+        distractors = db.query(Letter).filter(
+            Letter.id != correct_letter.id
+        ).order_by(func.random()).limit(count).all()
 
     if len(distractors) < count:
         raise ValueError(f"Not enough letters for {count} distractors")
@@ -171,10 +219,16 @@ def create_quiz(
     Create a new quiz with QUESTIONS_PER_QUIZ questions.
 
     Process:
-    1. Select letters using adaptive algorithm
-    2. Generate question types (mixed)
-    3. Create QuizAttempt and QuizQuestion records
-    4. Format questions for frontend
+    1. Get user's difficulty level
+    2. Select letters using adaptive algorithm
+    3. Generate question types based on difficulty level
+    4. Create QuizAttempt and QuizQuestion records
+    5. Format questions for frontend
+
+    Difficulty mechanics:
+    - Level 1: 40% audio, 3 random distractors
+    - Level 2: 65% audio, 3 similar distractors
+    - Level 3: 80% audio, 2 similar distractors
 
     Args:
         db: Database session
@@ -184,6 +238,25 @@ def create_quiz(
     Returns:
         Tuple of (QuizAttempt object, list of formatted question dicts)
     """
+    # Get user to determine difficulty level
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise ValueError(f"User {user_id} not found")
+
+    # Determine difficulty parameters based on level
+    if user.current_level == 1:
+        audio_ratio = LEVEL_1_AUDIO_RATIO
+        distractor_count = DISTRACTOR_COUNT
+        use_similar_distractors = False
+    elif user.current_level == 2:
+        audio_ratio = LEVEL_2_AUDIO_RATIO
+        distractor_count = DISTRACTOR_COUNT
+        use_similar_distractors = True
+    else:  # Level 3
+        audio_ratio = LEVEL_3_AUDIO_RATIO
+        distractor_count = LEVEL_3_DISTRACTOR_COUNT
+        use_similar_distractors = True
+
     # Create quiz attempt
     quiz = QuizAttempt(
         user_id=user_id,
@@ -195,7 +268,11 @@ def create_quiz(
 
     # Select letters and question types
     selected_letters = select_letters_for_quiz(db, user_id, count=QUESTIONS_PER_QUIZ)
-    question_types = generate_question_types(count=QUESTIONS_PER_QUIZ, include_audio=include_audio)
+    question_types = generate_question_types(
+        count=QUESTIONS_PER_QUIZ,
+        include_audio=include_audio,
+        audio_ratio=audio_ratio
+    )
 
     # Shuffle selected_letters to ensure random pairing with question types
     # (both lists are independently randomized, but zip creates deterministic pairing)
@@ -204,8 +281,13 @@ def create_quiz(
     formatted_questions = []
 
     for i, (letter, qtype) in enumerate(zip(selected_letters, question_types)):
-        # Generate distractors
-        distractors = generate_distractors(db, letter, count=DISTRACTOR_COUNT)
+        # Generate distractors based on difficulty level
+        distractors = generate_distractors(
+            db,
+            letter,
+            count=distractor_count,
+            use_similar=use_similar_distractors
+        )
 
         # Format question for frontend
         formatted = format_question(letter, qtype, distractors)

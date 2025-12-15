@@ -6,9 +6,10 @@ from pydantic import BaseModel, Field, validator
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 from app.db.database import get_db
-from app.db.models import QuizAttempt, QuizQuestion, UserLetterStat, Letter
+from app.db.models import QuizAttempt, QuizQuestion, UserLetterStat, Letter, User
 from app.services.quiz_generator import create_quiz, evaluate_answer
 from app.services.mastery import update_letter_stats, get_mastery_state
+from app.services.level_progression import check_and_update_level, get_level_progress
 from app.constants import (
     COOKIE_NAME,
     MIN_LETTER_OCCURRENCES_IN_QUIZ,
@@ -237,10 +238,22 @@ async def submit_answer(
             quiz.completed_at = datetime.utcnow()
             quiz.accuracy = quiz.correct_count / quiz.question_count
 
+            # Get user for level-up check
+            user = db.query(User).filter(User.id == user_id).first()
+
+            # Check for level-up
+            level_up_data = None
+            if user:
+                level_up_data = check_and_update_level(db, user, quiz)
+
             db.commit()
 
             # Generate summary
             summary = generate_quiz_summary(db, quiz, user_id)
+
+            # Include level-up data in response if applicable
+            if level_up_data:
+                summary["level_up"] = level_up_data
 
             return {
                 **result,
@@ -390,6 +403,12 @@ def generate_quiz_summary(db: Session, quiz: QuizAttempt, user_id: str) -> Dict:
     # Calculate performance trend
     trend_data = calculate_trend(db, user_id, quiz.id, quiz.accuracy)
 
+    # Get user level progress
+    user = db.query(User).filter(User.id == user_id).first()
+    level_progress = None
+    if user:
+        level_progress = get_level_progress(user)
+
     return {
         "quiz_id": quiz.id,
         "correct_count": quiz.correct_count,
@@ -400,5 +419,6 @@ def generate_quiz_summary(db: Session, quiz: QuizAttempt, user_id: str) -> Dict:
         "weak_letters": weak_letters,
         "quiz_history": quiz_history,
         "overall_weak_letters": overall_weak_letters,
-        "trend": trend_data
+        "trend": trend_data,
+        "level_progress": level_progress
     }

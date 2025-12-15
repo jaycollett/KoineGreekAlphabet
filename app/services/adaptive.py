@@ -108,7 +108,11 @@ def select_letter_balanced(
         eligible_letters.append(letter)
 
     if not eligible_letters:
-        # Fallback: all letters are recent, just pick randomly
+        # Fallback: all letters are recent, pick from non-selected letters
+        non_selected = [l for l in all_letters if l.id not in recent_selections]
+        if non_selected:
+            return random.choice(non_selected)
+        # Ultimate fallback: allow duplicates only if all letters already selected
         return random.choice(all_letters)
 
     return random.choices(eligible_letters, weights=weights, k=1)[0]
@@ -175,7 +179,11 @@ def select_letter_adaptive(
     # For the 40% quota, select from all eligible letters
     all_eligible = weak_letters + mastered_letters
     if not all_eligible:
-        # Fallback: all letters are recent
+        # Fallback: all letters are recent, pick from non-selected letters
+        non_selected = [l for l in all_letters if l.id not in recent_selections]
+        if non_selected:
+            return random.choice(non_selected)
+        # Ultimate fallback: allow duplicates only if all letters already selected
         return random.choice(all_letters)
 
     # Equal weight for coverage selection

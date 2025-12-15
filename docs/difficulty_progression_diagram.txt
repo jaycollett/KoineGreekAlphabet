@@ -1,0 +1,306 @@
+================================================================================
+DIFFICULTY PROGRESSION SCHEMA - ENTITY RELATIONSHIP DIAGRAM
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              USERS TABLE (Modified)                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ id                            TEXT       PRIMARY KEY (UUID)                 │
+│ created_at                    TIMESTAMP  NOT NULL                           │
+│ last_active_at                TIMESTAMP  NOT NULL                           │
+│                                                                              │
+│ ┌──────────────────────────────────────────────────────────────────┐        │
+│ │ NEW: DIFFICULTY PROGRESSION COLUMNS                              │        │
+│ ├──────────────────────────────────────────────────────────────────┤        │
+│ │ current_level                INTEGER    NOT NULL DEFAULT 1       │        │
+│ │                                         CHECK (1-3)              │        │
+│ │ consecutive_perfect_streak   INTEGER    NOT NULL DEFAULT 0       │        │
+│ │                                         CHECK (≥0)               │        │
+│ │ level_up_count               INTEGER    NOT NULL DEFAULT 0       │        │
+│ │                                         CHECK (≥0)               │        │
+│ └──────────────────────────────────────────────────────────────────┘        │
+│                                                                              │
+│ Indexes:                                                                     │
+│   - idx_users_level ON (current_level)                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │ One-to-Many
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    LEVEL_PROGRESSIONS TABLE (New)                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ id                            INTEGER    PRIMARY KEY AUTOINCREMENT          │
+│ user_id                       TEXT       FOREIGN KEY → users(id)            │
+│                                          ON DELETE CASCADE                   │
+│ from_level                    INTEGER    NOT NULL, CHECK (1-3)              │
+│ to_level                      INTEGER    NOT NULL, CHECK (1-3)              │
+│                                          CHECK (to_level = from_level + 1)  │
+│ achieved_at                   TIMESTAMP  NOT NULL DEFAULT NOW               │
+│ perfect_streak_count          INTEGER    NOT NULL                           │
+│                                                                              │
+│ Indexes:                                                                     │
+│   - idx_level_progressions_user ON (user_id, achieved_at DESC)             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+DATA FLOW: QUIZ COMPLETION → LEVEL-UP
+================================================================================
+
+┌──────────────┐
+│ User Completes│
+│   Quiz       │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ Is quiz perfect (14/14)?                                          │
+├──────────────────────────────────────────────────────────────────┤
+│ YES → Increment users.consecutive_perfect_streak += 1            │
+│ NO  → Reset users.consecutive_perfect_streak = 0                 │
+└──────┬───────────────────────────────────────────────────────────┘
+       │
+       ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ Check: current_level < 3 AND consecutive_perfect_streak >= 10?   │
+├──────────────────────────────────────────────────────────────────┤
+│ YES → Proceed to Level-Up                                        │
+│ NO  → End (no level-up)                                          │
+└──────┬───────────────────────────────────────────────────────────┘
+       │
+       ▼ YES
+┌──────────────────────────────────────────────────────────────────┐
+│ BEGIN TRANSACTION                                                 │
+├──────────────────────────────────────────────────────────────────┤
+│ 1. INSERT INTO level_progressions                                │
+│    (user_id, from_level, to_level, perfect_streak_count)         │
+│    VALUES (?, current_level, current_level + 1, 10)              │
+│                                                                   │
+│ 2. UPDATE users SET                                              │
+│    current_level = current_level + 1,                            │
+│    consecutive_perfect_streak = 0,                               │
+│    level_up_count = level_up_count + 1                           │
+│    WHERE id = ?                                                  │
+│                                                                   │
+│ 3. COMMIT                                                        │
+└──────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+STATE TRANSITIONS: USER PROGRESSION JOURNEY
+================================================================================
+
+New User Created
+    │
+    │ Default State:
+    │ - current_level = 1
+    │ - consecutive_perfect_streak = 0
+    │ - level_up_count = 0
+    ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│                           LEVEL 1                                     │
+│                                                                       │
+│  Perfect Quiz → streak++                                             │
+│  Non-Perfect  → streak = 0                                           │
+│                                                                       │
+│  Condition: streak == 10                                             │
+└───────────────────────┬───────────────────────────────────────────────┘
+                        │
+                        │ Level-Up (record in level_progressions)
+                        │ Reset streak = 0
+                        ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│                           LEVEL 2                                     │
+│                                                                       │
+│  Perfect Quiz → streak++                                             │
+│  Non-Perfect  → streak = 0                                           │
+│                                                                       │
+│  Condition: streak == 10                                             │
+└───────────────────────┬───────────────────────────────────────────────┘
+                        │
+                        │ Level-Up (record in level_progressions)
+                        │ Reset streak = 0
+                        ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│                           LEVEL 3 (MAX)                               │
+│                                                                       │
+│  Perfect Quiz → streak++ (no more level-ups)                         │
+│  Non-Perfect  → streak = 0                                           │
+│                                                                       │
+│  User stays at Level 3 (can continue building streak for other       │
+│  achievements/features in future)                                    │
+└───────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+EXAMPLE: USER PROGRESSION RECORDS
+================================================================================
+
+USERS TABLE:
+┌───────────┬─────────┬────────┬────────────┬─────────────┐
+│ id        │ current │ streak │ level_up   │ created_at  │
+│           │ _level  │        │ _count     │             │
+├───────────┼─────────┼────────┼────────────┼─────────────┤
+│ alice-123 │ 3       │ 5      │ 2          │ 2025-01-15  │
+│ bob-456   │ 2       │ 7      │ 1          │ 2025-02-10  │
+│ carol-789 │ 1       │ 3      │ 0          │ 2025-03-05  │
+└───────────┴─────────┴────────┴────────────┴─────────────┘
+
+LEVEL_PROGRESSIONS TABLE:
+┌────┬───────────┬────────┬────────┬──────────┬─────────────┐
+│ id │ user_id   │ from   │ to     │ perfect  │ achieved_at │
+│    │           │ _level │ _level │ _streak  │             │
+├────┼───────────┼────────┼────────┼──────────┼─────────────┤
+│ 1  │ alice-123 │ 1      │ 2      │ 10       │ 2025-01-20  │
+│ 2  │ alice-123 │ 2      │ 3      │ 10       │ 2025-01-28  │
+│ 3  │ bob-456   │ 1      │ 2      │ 10       │ 2025-02-15  │
+└────┴───────────┴────────┴────────┴──────────┴─────────────┘
+
+INTERPRETATION:
+- Alice: Reached Level 3, currently on a 5-quiz perfect streak
+  - Took 5 days to go from Level 1 → 2
+  - Took 8 days to go from Level 2 → 3
+- Bob: Currently at Level 2, 7/10 perfect quizzes toward Level 3 (3 more needed)
+- Carol: Still at Level 1, working on first 10 perfect quizzes
+
+
+================================================================================
+QUERY PATTERNS: INDEXES OPTIMIZE THESE OPERATIONS
+================================================================================
+
+Fast Queries (Index-Optimized):
+┌──────────────────────────────────────────────────────────────────┐
+│ 1. Get user's current level/streak                               │
+│    SELECT current_level, consecutive_perfect_streak              │
+│    FROM users WHERE id = ?                                       │
+│    ► Uses: Primary key (instant)                                 │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 2. Get user's progression history                                │
+│    SELECT * FROM level_progressions                              │
+│    WHERE user_id = ? ORDER BY achieved_at DESC                   │
+│    ► Uses: idx_level_progressions_user (fast)                    │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 3. Count users at each level (analytics)                         │
+│    SELECT current_level, COUNT(*) FROM users                     │
+│    GROUP BY current_level                                        │
+│    ► Uses: idx_users_level (optimized)                           │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 4. Update user streak                                            │
+│    UPDATE users SET consecutive_perfect_streak = ?               │
+│    WHERE id = ?                                                  │
+│    ► Uses: Primary key (instant)                                 │
+└──────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+CONSTRAINTS: DATA INTEGRITY ENFORCEMENT
+================================================================================
+
+CHECK Constraints (Enforced by SQLite):
+┌──────────────────────────────────────────────────────────────────┐
+│ users.current_level:                                              │
+│   CHECK (current_level >= 1 AND current_level <= 3)             │
+│   ✓ Valid:   1, 2, 3                                             │
+│   ✗ Invalid: 0, 4, 5, -1, NULL                                   │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│ users.consecutive_perfect_streak:                                 │
+│   CHECK (consecutive_perfect_streak >= 0)                        │
+│   ✓ Valid:   0, 1, 5, 10, 100                                    │
+│   ✗ Invalid: -1, -5, NULL                                        │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│ level_progressions.from_level and to_level:                       │
+│   CHECK (from_level >= 1 AND from_level <= 3)                   │
+│   CHECK (to_level >= 1 AND to_level <= 3)                       │
+│   CHECK (to_level = from_level + 1)                             │
+│   ✓ Valid:   1→2, 2→3                                            │
+│   ✗ Invalid: 1→3 (skip), 2→1 (backward), 3→4 (too high)         │
+└──────────────────────────────────────────────────────────────────┘
+
+Foreign Key with CASCADE:
+┌──────────────────────────────────────────────────────────────────┐
+│ level_progressions.user_id → users.id ON DELETE CASCADE          │
+│                                                                   │
+│ When user is deleted:                                            │
+│   → All level_progressions records for that user are            │
+│     automatically deleted                                        │
+│   → Maintains referential integrity                              │
+│   → Supports GDPR compliance (right to be forgotten)             │
+└──────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+MIGRATION SAFETY CHECKLIST
+================================================================================
+
+Before Migration:
+  [ ] Backup database: cp greek_alphabet_mastery.db greek_alphabet_mastery.db.backup
+  [ ] All tests passing: pytest
+  [ ] No uncommitted changes: git status
+
+Run Migration:
+  [ ] python migrations/002_add_difficulty_progression.py
+  [ ] Check for errors in output
+  [ ] Verify success message
+
+Post-Migration Validation:
+  [ ] Verify columns added: PRAGMA table_info(users);
+  [ ] Verify table created: SELECT name FROM sqlite_master WHERE name='level_progressions';
+  [ ] Verify indexes created: SELECT name FROM sqlite_master WHERE type='index';
+  [ ] Test constraints: Try invalid inserts (should fail)
+  [ ] Run test suite: pytest tests/test_difficulty_progression_schema.py -v
+
+If Issues Occur:
+  [ ] Rollback: python migrations/002_add_difficulty_progression.py rollback
+  [ ] Restore backup: cp greek_alphabet_mastery.db.backup greek_alphabet_mastery.db
+  [ ] Review error messages
+  [ ] Fix issues and retry
+
+
+================================================================================
+PERFORMANCE CHARACTERISTICS
+================================================================================
+
+Read Operations (Optimized):
+  ✓ Get user level:               < 1ms   (Primary key lookup)
+  ✓ Get user progression history: < 5ms   (Index: user_id + achieved_at)
+  ✓ Count users by level:         < 10ms  (Index: current_level)
+
+Write Operations:
+  ✓ Update streak:                < 1ms   (Primary key update)
+  ✓ Level-up transaction:         < 5ms   (2 writes in transaction)
+
+Analytics Queries:
+  ~ Average time to level 2:      50-100ms (Full scan of progressions)
+  ~ Quiz performance by level:    100-500ms (Complex JOINs)
+
+Storage Overhead:
+  Users table:     +12 bytes per user (3 integers)
+  Progressions:    ~40 bytes per level-up (max 2 per user)
+  Total:           Minimal (<100 bytes per user worst case)
+
+
+================================================================================
+SUMMARY
+================================================================================
+
+This schema design provides:
+
+✓ Minimal additions (3 columns + 1 table)
+✓ Strong data integrity (CHECK constraints)
+✓ Efficient queries (strategic indexes)
+✓ Complete audit trail (level_progressions history)
+✓ Safe migration (idempotent, with rollback)
+✓ Future-proof (easy to extend)
+
+Ready for integration with application logic and frontend UI.

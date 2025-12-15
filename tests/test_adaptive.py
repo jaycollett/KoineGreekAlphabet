@@ -1,6 +1,7 @@
 """Unit tests for adaptive selection algorithm."""
 import pytest
-from app.db.models import QuizAttempt, UserLetterStat
+from datetime import datetime
+from app.db.models import QuizAttempt, UserLetterStat, Letter
 from app.services.adaptive import (
     should_use_adaptive_mode,
     select_letters_for_quiz,
@@ -26,7 +27,7 @@ class TestAdaptiveMode:
                 question_count=14,
                 correct_count=10,
                 accuracy=0.71,
-                completed_at=test_db.query(QuizAttempt).first().started_at if i > 0 else None
+                completed_at=datetime.utcnow()
             )
             test_db.add(quiz)
         test_db.commit()
@@ -40,7 +41,7 @@ class TestAdaptiveMode:
             question_count=14,
             correct_count=12,
             accuracy=0.86,
-            completed_at=test_db.query(QuizAttempt).first().started_at
+            completed_at=datetime.utcnow()
         )
         test_db.add(quiz)
         test_db.commit()

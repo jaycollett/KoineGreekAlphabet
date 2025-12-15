@@ -14,6 +14,13 @@
 
     <!-- Summary Content -->
     <div id="summary-content" class="hidden">
+        <!-- Level-Up Celebration Banner -->
+        <div id="level-up-banner" class="level-up-banner hidden" role="alert" aria-live="polite">
+            <span class="level-up-icon">🎉</span>
+            <h3 class="text-2xl font-bold text-yellow-300 mb-2" id="level-up-title">Level Up!</h3>
+            <p class="text-gray-200 text-lg" id="level-up-message"></p>
+        </div>
+
         <!-- Score Display -->
         <div class="text-center mb-8">
             <h2 class="text-3xl font-bold mb-4 text-gray-100">Quiz Complete!</h2>
@@ -24,6 +31,23 @@
             </div>
 
             <p class="text-lg text-gray-300" id="feedback-message"></p>
+        </div>
+
+        <!-- Level Progress Update (if not leveled up) -->
+        <div id="level-progress-section" class="hidden mb-6">
+            <div class="bg-slate-700 border border-slate-600 rounded-lg p-4">
+                <h3 class="font-semibold text-gray-200 mb-3 text-center">Level Progress</h3>
+                <div class="max-w-md mx-auto">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm text-gray-300" id="level-progress-info">Level 1</span>
+                        <span class="text-sm font-semibold text-gray-300" id="level-progress-percent-summary">0%</span>
+                    </div>
+                    <div class="level-progress-bar-container">
+                        <div class="level-progress-bar-fill" id="level-progress-fill-summary" style="width: 0%"></div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2 text-center" id="level-progress-helper-summary"></p>
+                </div>
+            </div>
         </div>
 
         <!-- Trend Indicator -->
