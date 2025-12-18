@@ -42,30 +42,33 @@ function displaySummary() {
     }
 
     // Display trend indicator
-    if (summary.trend) {
+    if (summary.trend && summary.trend.change_percent != null && summary.trend.recent_average != null) {
         document.getElementById('trend-section').classList.remove('hidden');
         const trendIndicator = document.getElementById('trend-indicator');
         const trendText = document.getElementById('trend-text');
         const trendDetails = document.getElementById('trend-details');
+
+        const changePercent = Math.abs(summary.trend.change_percent || 0);
+        const recentAverage = summary.trend.recent_average || 0;
 
         if (summary.trend.trend === 'up') {
             trendIndicator.textContent = '↑';
             trendIndicator.className = 'text-4xl font-bold text-green-400';
             trendText.textContent = 'Improving!';
             trendText.className = 'text-lg text-green-400 font-semibold';
-            trendDetails.textContent = `${Math.abs(summary.trend.change_percent)}% above recent average (${summary.trend.recent_average}%)`;
+            trendDetails.textContent = `${changePercent}% above recent average (${recentAverage}%)`;
         } else if (summary.trend.trend === 'down') {
             trendIndicator.textContent = '↓';
             trendIndicator.className = 'text-4xl font-bold text-yellow-400';
             trendText.textContent = 'Keep practicing';
             trendText.className = 'text-lg text-yellow-400 font-semibold';
-            trendDetails.textContent = `${Math.abs(summary.trend.change_percent)}% below recent average (${summary.trend.recent_average}%)`;
+            trendDetails.textContent = `${changePercent}% below recent average (${recentAverage}%)`;
         } else {
             trendIndicator.textContent = '→';
             trendIndicator.className = 'text-4xl font-bold text-blue-400';
             trendText.textContent = 'Stable';
             trendText.className = 'text-lg text-blue-400 font-semibold';
-            trendDetails.textContent = `Consistent with recent average (${summary.trend.recent_average}%)`;
+            trendDetails.textContent = `Consistent with recent average (${recentAverage}%)`;
         }
     }
 
@@ -89,9 +92,9 @@ function displaySummary() {
         const weakLettersEl = document.getElementById('overall-weak-letters');
         weakLettersEl.innerHTML = summary.overall_weak_letters.map(letter => `
             <div class="flex justify-between items-center bg-slate-600 border border-slate-500 rounded p-2">
-                <span class="font-semibold text-gray-200">${letter.name}</span>
+                <span class="font-semibold text-gray-200">${letter.name || 'Unknown'}</span>
                 <span class="text-sm text-gray-400">
-                    ${Math.round(letter.accuracy * 100)}% accuracy
+                    ${Math.round((letter.accuracy || 0) * 100)}% accuracy
                 </span>
             </div>
         `).join('');
@@ -101,16 +104,20 @@ function displaySummary() {
     if (summary.quiz_history && summary.quiz_history.length > 1) {
         document.getElementById('history-section').classList.remove('hidden');
         const historyEl = document.getElementById('quiz-history');
-        historyEl.innerHTML = summary.quiz_history.slice(0, 5).map((quiz, index) => `
-            <div class="flex justify-between items-center bg-slate-700 border border-slate-600 rounded p-2">
-                <span class="text-sm text-gray-400">
-                    ${index === 0 ? 'Just now' : 'Quiz ' + (index + 1)}
-                </span>
-                <span class="font-semibold ${quiz.accuracy >= 0.8 ? 'text-green-400' : 'text-yellow-400'}">
-                    ${quiz.correct_count}/${14} (${Math.round(quiz.accuracy * 100)}%)
-                </span>
-            </div>
-        `).join('');
+        historyEl.innerHTML = summary.quiz_history.slice(0, 5).map((quiz, index) => {
+            const accuracy = quiz.accuracy || 0;
+            const correctCount = quiz.correct_count || 0;
+            return `
+                <div class="flex justify-between items-center bg-slate-700 border border-slate-600 rounded p-2">
+                    <span class="text-sm text-gray-400">
+                        ${index === 0 ? 'Just now' : 'Quiz ' + (index + 1)}
+                    </span>
+                    <span class="font-semibold ${accuracy >= 0.8 ? 'text-green-400' : 'text-yellow-400'}">
+                        ${correctCount}/14 (${Math.round(accuracy * 100)}%)
+                    </span>
+                </div>
+            `;
+        }).join('');
     }
 }
 
@@ -159,16 +166,21 @@ function displayLevelProgress(levelProgress) {
         3: 'Advanced'
     };
 
-    levelInfo.textContent = `Level ${levelProgress.current_level} - ${levelDescriptions[levelProgress.current_level]}`;
-    progressPercent.textContent = `${Math.round(levelProgress.progress_to_next)}%`;
-    progressFill.style.width = `${levelProgress.progress_to_next}%`;
+    // Use correct field names from backend with safe fallbacks
+    const progress = levelProgress.progress_percentage || 0;
+    const currentStreak = levelProgress.perfect_streak || 0;
+    const requiredStreak = levelProgress.required_streak || 5;
 
-    if (levelProgress.current_level === 3 && levelProgress.progress_to_next === 100) {
+    levelInfo.textContent = `Level ${levelProgress.current_level} - ${levelDescriptions[levelProgress.current_level]}`;
+    progressPercent.textContent = `${Math.round(progress)}%`;
+    progressFill.style.width = `${progress}%`;
+
+    if (levelProgress.current_level === 3 && progress >= 100) {
         helperText.innerHTML = '<span class="text-yellow-400 font-semibold">Max level achieved!</span>';
-    } else if (levelProgress.consecutive_perfect_streak > 0) {
-        helperText.textContent = `${levelProgress.consecutive_perfect_streak}/10 perfect quizzes - ${levelProgress.next_level_requirements}`;
+    } else if (currentStreak > 0) {
+        helperText.textContent = `${currentStreak}/${requiredStreak} perfect quizzes - Complete ${requiredStreak - currentStreak} more to level up`;
     } else {
-        helperText.textContent = levelProgress.next_level_requirements || 'Complete perfect quizzes to level up';
+        helperText.textContent = 'Complete perfect quizzes to level up';
     }
 
     section.classList.remove('hidden');
