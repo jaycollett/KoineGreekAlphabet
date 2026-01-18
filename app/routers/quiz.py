@@ -16,7 +16,8 @@ from app.constants import (
     MIN_ATTEMPTS_FOR_WEAK_IDENTIFICATION,
     WEAK_LETTER_THRESHOLD,
     RECENT_QUIZ_HISTORY_LIMIT,
-    WEAK_LETTERS_SUMMARY_COUNT
+    WEAK_LETTERS_SUMMARY_COUNT,
+    MAX_RESPONSE_TIME_MS
 )
 
 router = APIRouter(prefix="/api/quiz", tags=["quiz"])
@@ -26,6 +27,7 @@ class AnswerSubmission(BaseModel):
     """Request body for answer submission."""
     question_id: int = Field(..., gt=0, description="Question ID must be a positive integer")
     selected_option: str = Field(..., min_length=1, max_length=100, description="Selected option text")
+    response_time_ms: int = Field(None, ge=0, description="Response time in milliseconds")
 
     @validator('selected_option')
     def validate_option(cls, v):
@@ -82,6 +84,7 @@ async def get_quiz_state(
 
     # Format questions for frontend
     from app.services.quiz_generator import QuestionType
+    from app.constants import AUDIO_PATH_TEMPLATE
     formatted_questions = []
 
     for i, (question, letter) in enumerate(questions):
@@ -98,22 +101,43 @@ async def get_quiz_state(
         # Filter out None values
         options = [opt for opt in saved_options if opt is not None]
 
-        # Reconstruct prompt and display using format_question logic
-        from app.services.quiz_generator import format_question, generate_distractors
-        # We still need distractors for format_question, but we'll override options
-        distractors = generate_distractors(db, letter, count=3)
-        formatted = format_question(letter, qtype, distractors)
+        # Build prompt and display directly from question type and letter
+        # WITHOUT regenerating distractors (which caused inconsistent options)
+        prompt = ""
+        display_letter = None
+        audio_file = None
+        is_audio_question = False
+
+        if qtype == QuestionType.LETTER_TO_NAME:
+            prompt = "Which letter is this?"
+            # For display, prefer uppercase if saved answer looks like a name
+            display_letter = letter.uppercase if question.correct_option == letter.name else letter.lowercase
+            # Actually, we don't know which form was shown, but we can use either
+            # since both represent the same letter - pick based on correct_option format
+            display_letter = letter.uppercase  # Default to uppercase for consistency
+        elif qtype == QuestionType.NAME_TO_UPPER:
+            prompt = f"Select the uppercase form of {letter.name}"
+        elif qtype == QuestionType.NAME_TO_LOWER:
+            prompt = f"Select the lowercase form of {letter.name}"
+        elif qtype == QuestionType.AUDIO_TO_UPPER:
+            prompt = "Listen and select the uppercase form of this letter"
+            audio_file = AUDIO_PATH_TEMPLATE.format(letter_name=letter.name.lower())
+            is_audio_question = True
+        elif qtype == QuestionType.AUDIO_TO_LOWER:
+            prompt = "Listen and select the lowercase form of this letter"
+            audio_file = AUDIO_PATH_TEMPLATE.format(letter_name=letter.name.lower())
+            is_audio_question = True
 
         formatted_questions.append({
             "question_id": question.id,
             "question_number": i + 1,
-            "prompt": formatted["prompt"],
-            "display_letter": formatted["display_letter"],
-            "options": options,  # Use saved options instead of regenerated ones
-            "correct_answer": formatted["correct_answer"],
+            "prompt": prompt,
+            "display_letter": display_letter,
+            "options": options,  # Use saved options from database
+            "correct_answer": question.correct_option,  # Use saved correct answer
             "letter_name": letter.name,
-            "audio_file": formatted.get("audio_file"),
-            "is_audio_question": formatted.get("is_audio_question", False),
+            "audio_file": audio_file,
+            "is_audio_question": is_audio_question,
             "is_answered": question.chosen_option is not None,
             "was_correct": question.is_correct == 1 if question.chosen_option else None
         })
@@ -205,8 +229,13 @@ async def submit_answer(
                 "already_answered": True
             }
 
+        # Cap response time at maximum allowed value
+        response_time = None
+        if answer.response_time_ms is not None:
+            response_time = min(answer.response_time_ms, MAX_RESPONSE_TIME_MS)
+
         # Evaluate answer
-        result = evaluate_answer(db, answer.question_id, answer.selected_option)
+        result = evaluate_answer(db, answer.question_id, answer.selected_option, response_time)
 
         # Update quiz correct count
         if result["is_correct"]:
@@ -409,6 +438,12 @@ def generate_quiz_summary(db: Session, quiz: QuizAttempt, user_id: str) -> Dict:
     if user:
         level_progress = get_level_progress(user)
 
+    # Calculate average response time for this quiz
+    response_times = [q.response_time_ms for q in questions if q.response_time_ms is not None]
+    avg_response_time_ms = None
+    if response_times:
+        avg_response_time_ms = int(sum(response_times) / len(response_times))
+
     return {
         "quiz_id": quiz.id,
         "correct_count": quiz.correct_count,
@@ -420,5 +455,6 @@ def generate_quiz_summary(db: Session, quiz: QuizAttempt, user_id: str) -> Dict:
         "quiz_history": quiz_history,
         "overall_weak_letters": overall_weak_letters,
         "trend": trend_data,
-        "level_progress": level_progress
+        "level_progress": level_progress,
+        "avg_response_time_ms": avg_response_time_ms
     }

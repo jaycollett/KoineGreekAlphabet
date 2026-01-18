@@ -4,6 +4,7 @@ from typing import List, Tuple
 from sqlalchemy.orm import Session
 from app.db.models import Letter, UserLetterStat, QuizAttempt
 from app.services.mastery import MasteryState, get_mastery_state
+from app.services.spaced_repetition import get_sr_weight_for_letter
 from app.constants import (
     QUESTIONS_PER_QUIZ,
     ADAPTIVE_MODE_THRESHOLD,
@@ -160,13 +161,17 @@ def select_letter_adaptive(
                 stat.correct_count,
                 stat.current_streak
             )
+
+            # Calculate weakness score with SR boost for due letters
             weakness_score = 1.0 - stat.mastery_score
+            sr_weight = get_sr_weight_for_letter(stat)
+            weighted_weakness = weakness_score * sr_weight
 
             if state == MasteryState.MASTERED:
                 mastered_letters.append(letter)
             else:
                 weak_letters.append(letter)
-                weakness_weights.append(weakness_score)
+                weakness_weights.append(weighted_weakness)
         else:
             # Unseen letters are considered weak
             weak_letters.append(letter)

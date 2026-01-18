@@ -5,6 +5,7 @@ let currentQuestionIndex = 0;
 let correctCount = 0;
 let awaitingNext = false;
 let currentAudio = null;
+let questionStartTime = null;  // Track when question was displayed
 
 async function startQuiz() {
     try {
@@ -108,6 +109,9 @@ function displayQuestion() {
     const progress = (currentQuestionIndex / currentQuiz.question_count) * 100;
     document.getElementById('progress-bar').style.width = progress + '%';
 
+    // Update ARIA attributes for accessibility
+    updateProgressBarAria();
+
     // Display question prompt
     document.getElementById('question-prompt').textContent = question.prompt;
 
@@ -150,9 +154,11 @@ function displayQuestion() {
     const optionsContainer = document.getElementById('options-container');
     optionsContainer.innerHTML = question.options.map((option, index) => `
         <button
-            class="quiz-option w-full bg-slate-700 hover:bg-slate-600 border-2 border-slate-600 hover:border-blue-500 rounded-lg p-4 text-center font-bold text-white transition duration-200"
+            class="quiz-option w-full bg-slate-700 hover:bg-slate-600 border-2 border-slate-600 hover:border-blue-500 rounded-lg p-4 text-center font-bold text-white transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800"
             onclick="selectAnswer('${escapeHtml(option)}', ${question.question_id}, '${escapeHtml(question.correct_answer)}')"
             data-option="${escapeHtml(option)}"
+            data-option-index="${index}"
+            aria-label="Answer option: ${escapeHtml(option)}"
         >
             ${escapeHtml(option)}
         </button>
@@ -161,6 +167,17 @@ function displayQuestion() {
     // Hide next button
     document.getElementById('next-button-container').classList.add('hidden');
     awaitingNext = false;
+
+    // Start timing for response time analytics
+    questionStartTime = Date.now();
+
+    // Focus first option for keyboard users (with slight delay for DOM update)
+    setTimeout(() => {
+        const firstOption = optionsContainer.querySelector('button');
+        if (firstOption) {
+            firstOption.focus();
+        }
+    }, 100);
 }
 
 function escapeHtml(text) {
@@ -176,6 +193,9 @@ async function selectAnswer(selectedOption, questionId, correctAnswer) {
 
     awaitingNext = true;
 
+    // Calculate response time
+    const responseTimeMs = questionStartTime ? Date.now() - questionStartTime : null;
+
     // Disable all option buttons
     const buttons = document.querySelectorAll('#options-container button');
     buttons.forEach(btn => {
@@ -184,15 +204,21 @@ async function selectAnswer(selectedOption, questionId, correctAnswer) {
     });
 
     try {
+        const requestBody = {
+            question_id: questionId,
+            selected_option: selectedOption
+        };
+        // Only include response time if we tracked it
+        if (responseTimeMs !== null) {
+            requestBody.response_time_ms = responseTimeMs;
+        }
+
         const response = await fetch(`/api/quiz/${currentQuiz.quiz_id}/answer`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                question_id: questionId,
-                selected_option: selectedOption
-            })
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
@@ -291,6 +317,60 @@ function playAudioAgain() {
         currentAudio.play().catch(error => {
             console.error('Error playing audio:', error);
         });
+    }
+}
+
+// Keyboard navigation for answer options
+document.addEventListener('keydown', function(e) {
+    if (awaitingNext) return;
+
+    const optionsContainer = document.getElementById('options-container');
+    if (!optionsContainer) return;
+
+    const buttons = optionsContainer.querySelectorAll('button:not(:disabled)');
+    if (buttons.length === 0) return;
+
+    const focusedElement = document.activeElement;
+    const currentIndex = Array.from(buttons).indexOf(focusedElement);
+
+    switch (e.key) {
+        case 'ArrowDown':
+        case 'ArrowRight':
+            e.preventDefault();
+            if (currentIndex >= 0 && currentIndex < buttons.length - 1) {
+                buttons[currentIndex + 1].focus();
+            } else if (currentIndex === -1) {
+                buttons[0].focus();
+            }
+            break;
+        case 'ArrowUp':
+        case 'ArrowLeft':
+            e.preventDefault();
+            if (currentIndex > 0) {
+                buttons[currentIndex - 1].focus();
+            } else if (currentIndex === -1) {
+                buttons[buttons.length - 1].focus();
+            }
+            break;
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+            // Number keys for quick selection
+            const optionIndex = parseInt(e.key) - 1;
+            if (optionIndex >= 0 && optionIndex < buttons.length) {
+                buttons[optionIndex].click();
+            }
+            break;
+    }
+});
+
+// Update progress bar ARIA attributes
+function updateProgressBarAria() {
+    const progressBar = document.getElementById('quiz-progress');
+    if (progressBar && currentQuiz) {
+        progressBar.setAttribute('aria-valuenow', currentQuestionIndex);
+        progressBar.setAttribute('aria-valuemax', currentQuiz.question_count);
     }
 }
 

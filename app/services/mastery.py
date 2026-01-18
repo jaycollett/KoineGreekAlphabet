@@ -126,6 +126,13 @@ def update_letter_stats(
         stat.current_streak
     )
 
+    # Update spaced repetition schedule
+    from app.services.spaced_repetition import update_sr_schedule, schedule_initial_review
+    update_sr_schedule(stat, is_correct)
+
+    # If letter just reached mastery threshold, schedule initial review
+    schedule_initial_review(stat)
+
     return {
         "seen_count": stat.seen_count,
         "correct_count": stat.correct_count,

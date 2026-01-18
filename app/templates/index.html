@@ -34,6 +34,12 @@
                     <div class="text-xs text-gray-400 mt-2 text-center" id="level-helper-text">
                         Complete perfect quizzes to level up
                     </div>
+                    <!-- Streak Preservation Warning -->
+                    <div id="streak-warning" class="hidden mt-3 pt-3 border-t border-slate-600">
+                        <div class="flex items-center justify-center gap-2">
+                            <span class="text-sm" id="streak-warning-text"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -101,6 +107,17 @@
                     <div id="weak-letters" class="text-sm text-gray-300"></div>
                 </div>
             </div>
+
+            <!-- Commonly Confused Letters -->
+            <div id="confusion-section" class="hidden mt-6 pt-6 border-t border-slate-600">
+                <h4 class="font-semibold text-orange-400 mb-3 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Commonly Confused Letters
+                </h4>
+                <div id="confusion-pairs" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -158,9 +175,9 @@
 
                         const strongEl = document.getElementById('strong-letters');
                         if (data.mastery_summary.strong.length > 0) {
-                            strongEl.textContent = data.mastery_summary.strong
+                            strongEl.innerHTML = data.mastery_summary.strong
                                 .slice(0, 5)
-                                .map(l => l.name)
+                                .map(l => `<button onclick="openLetterDetailModal('${l.name}')" class="text-green-400 hover:text-green-300 hover:underline transition duration-200">${l.name}</button>`)
                                 .join(', ');
                         } else {
                             strongEl.textContent = 'Keep practicing!';
@@ -168,14 +185,36 @@
 
                         const weakEl = document.getElementById('weak-letters');
                         if (data.mastery_summary.weak.length > 0) {
-                            weakEl.textContent = data.mastery_summary.weak
+                            weakEl.innerHTML = data.mastery_summary.weak
                                 .slice(0, 5)
-                                .map(l => l.name)
+                                .map(l => `<button onclick="openLetterDetailModal('${l.name}')" class="text-yellow-400 hover:text-yellow-300 hover:underline transition duration-200">${l.name}</button>`)
                                 .join(', ');
                         } else {
                             weakEl.textContent = 'None - great job!';
                         }
                     }
+                }
+
+                // Show confusion pairs if available
+                if (data.confusion_pairs && data.confusion_pairs.length > 0) {
+                    document.getElementById('confusion-section').classList.remove('hidden');
+                    const pairsEl = document.getElementById('confusion-pairs');
+                    pairsEl.innerHTML = data.confusion_pairs.map(pair => `
+                        <div class="bg-slate-700 border border-slate-600 rounded-lg p-3 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <button onclick="openLetterDetailModal('${pair.letter1.name}')" class="text-center hover:bg-slate-600 rounded p-1 transition duration-200">
+                                    <span class="greek-letter-small text-white text-2xl font-serif">${pair.letter1.uppercase}</span>
+                                    <div class="text-xs text-gray-400">${pair.letter1.name}</div>
+                                </button>
+                                <span class="text-gray-500">⇄</span>
+                                <button onclick="openLetterDetailModal('${pair.letter2.name}')" class="text-center hover:bg-slate-600 rounded p-1 transition duration-200">
+                                    <span class="greek-letter-small text-white text-2xl font-serif">${pair.letter2.uppercase}</span>
+                                    <div class="text-xs text-gray-400">${pair.letter2.name}</div>
+                                </button>
+                            </div>
+                            <span class="text-xs text-orange-400 font-semibold">${pair.count}x</span>
+                        </div>
+                    `).join('');
                 }
             }
         } catch (error) {
@@ -235,6 +274,23 @@
             trendIndicator.classList.remove('hidden');
         } else {
             trendIndicator.classList.add('hidden');
+        }
+
+        // Streak preservation warning (show when 3+ perfect quizzes)
+        const streakWarning = document.getElementById('streak-warning');
+        const streakWarningText = document.getElementById('streak-warning-text');
+
+        if (currentStreak >= 3 && levelProgress.can_level_up) {
+            streakWarning.classList.remove('hidden');
+            if (remaining === 1) {
+                streakWarningText.innerHTML = `<span class="text-green-400 font-semibold">🔥 One away! Get a perfect score to level up!</span>`;
+            } else if (remaining === 0) {
+                streakWarningText.innerHTML = `<span class="text-green-400 font-semibold">🎯 Ready! Next perfect quiz triggers level-up!</span>`;
+            } else {
+                streakWarningText.innerHTML = `<span class="text-yellow-400">⚡ ${currentStreak} perfect in a row! Keep the streak alive!</span>`;
+            }
+        } else {
+            streakWarning.classList.add('hidden');
         }
 
         // Show the section

@@ -83,6 +83,10 @@ DEFAULT_LOG_LEVEL = "INFO"
 AUDIO_PATH_TEMPLATE = "/static/audio/{letter_name}.mp3"
 """Template for generating audio file paths. {letter_name} will be replaced with lowercase letter name."""
 
+# Response Time Analytics
+MAX_RESPONSE_TIME_MS = 60000
+"""Maximum response time to record (60 seconds in milliseconds). Higher values are capped."""
+
 # Difficulty Progression
 PERFECT_STREAK_FOR_LEVEL_UP = 5
 """Number of consecutive perfect quizzes (14/14) required to advance to next level."""
@@ -98,3 +102,19 @@ LEVEL_3_AUDIO_RATIO = 0.90
 
 LEVEL_3_DISTRACTOR_COUNT = 3
 """Number of distractors in Level 3 (4 total options, all extremely similar letters)."""
+
+# Spaced Repetition Configuration
+SR_INTERVALS_DAYS = [1, 3, 7, 14, 30]
+"""Interval progression for spaced repetition (in days). Level 0 = 1 day, Level 4 = 30 days."""
+
+SR_PRIORITY_WEIGHT = 2.0
+"""Weight multiplier for letters due for review in adaptive selection."""
+
+SR_MASTERY_DECAY_PER_DAY = 0.01
+"""Mastery score decay per day when a letter is overdue for review (1% per day)."""
+
+SR_MIN_MASTERY_FOR_SCHEDULING = 0.8
+"""Minimum mastery score threshold to enter spaced repetition scheduling."""
+
+SR_MAX_INTERVAL_LEVEL = len(SR_INTERVALS_DAYS) - 1
+"""Maximum interval level index."""

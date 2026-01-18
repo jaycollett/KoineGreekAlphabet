@@ -28,9 +28,25 @@
             <div class="inline-block bg-slate-700 border-2 border-slate-600 rounded-lg p-6 mb-4">
                 <div class="text-6xl font-bold text-blue-400 mb-2" id="score-display">0/14</div>
                 <div class="text-xl text-gray-300" id="accuracy-display">0%</div>
+                <!-- Average Response Time -->
+                <div id="response-time-display" class="hidden mt-3 pt-3 border-t border-slate-500">
+                    <div class="flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span class="text-sm text-gray-400">Avg response time: <span id="avg-response-time" class="font-semibold text-gray-300">-</span></span>
+                    </div>
+                </div>
             </div>
 
             <p class="text-lg text-gray-300" id="feedback-message"></p>
+        </div>
+
+        <!-- Streak Status Banner -->
+        <div id="streak-status-banner" class="hidden mb-6">
+            <div id="streak-status-content" class="rounded-lg p-4 text-center">
+                <!-- Content populated by JS -->
+            </div>
         </div>
 
         <!-- Level Progress Update (if not leveled up) -->

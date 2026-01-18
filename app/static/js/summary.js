@@ -20,6 +20,9 @@ function displaySummary() {
     } else if (summary.level_progress) {
         // Show level progress update if not leveled up
         displayLevelProgress(summary.level_progress);
+
+        // Show streak status banner
+        displayStreakStatus(summary.accuracy, summary.level_progress);
     }
 
     // Display score
@@ -27,6 +30,15 @@ function displaySummary() {
         `${summary.correct_count}/${summary.question_count}`;
     document.getElementById('accuracy-display').textContent =
         `${summary.accuracy_percentage}%`;
+
+    // Display average response time if available
+    if (summary.avg_response_time_ms !== null && summary.avg_response_time_ms !== undefined) {
+        const responseTimeDisplay = document.getElementById('response-time-display');
+        const avgResponseTime = document.getElementById('avg-response-time');
+        const seconds = (summary.avg_response_time_ms / 1000).toFixed(1);
+        avgResponseTime.textContent = `${seconds}s`;
+        responseTimeDisplay.classList.remove('hidden');
+    }
 
     // Feedback message
     const feedbackMessage = document.getElementById('feedback-message');
@@ -150,6 +162,49 @@ function displayLevelUpCelebration(newLevel, levelProgress) {
             banner.style.display = 'none';
         }, 1000);
     }, 10000);
+}
+
+function displayStreakStatus(accuracy, levelProgress) {
+    const banner = document.getElementById('streak-status-banner');
+    const content = document.getElementById('streak-status-content');
+
+    if (!banner || !content) return;
+
+    const isPerfect = accuracy >= 1.0;
+    const currentStreak = levelProgress.perfect_streak || 0;
+    const requiredStreak = levelProgress.required_streak || 5;
+    const canLevelUp = levelProgress.can_level_up !== false;
+
+    if (isPerfect && currentStreak > 0 && canLevelUp) {
+        // Perfect quiz - streak continues
+        banner.classList.remove('hidden');
+        content.className = 'rounded-lg p-4 text-center bg-green-900/30 border-2 border-green-500';
+
+        if (currentStreak === requiredStreak - 1) {
+            content.innerHTML = `
+                <div class="text-2xl mb-2">🔥</div>
+                <div class="text-green-400 font-bold text-lg">Perfect! ${currentStreak}/${requiredStreak} streak!</div>
+                <div class="text-green-300 text-sm mt-1">One more perfect quiz to level up!</div>
+            `;
+        } else {
+            content.innerHTML = `
+                <div class="text-2xl mb-2">✨</div>
+                <div class="text-green-400 font-bold text-lg">Perfect! Streak: ${currentStreak}/${requiredStreak}</div>
+                <div class="text-green-300 text-sm mt-1">Keep it up! ${requiredStreak - currentStreak} more to level up.</div>
+            `;
+        }
+    } else if (!isPerfect && currentStreak === 0 && levelProgress.previous_streak > 0) {
+        // Streak was reset (this quiz broke it)
+        banner.classList.remove('hidden');
+        content.className = 'rounded-lg p-4 text-center bg-yellow-900/30 border-2 border-yellow-500';
+        content.innerHTML = `
+            <div class="text-2xl mb-2">💪</div>
+            <div class="text-yellow-400 font-bold">Streak reset - but you've got this!</div>
+            <div class="text-yellow-300 text-sm mt-1">Start fresh and build your streak again.</div>
+        `;
+    } else {
+        banner.classList.add('hidden');
+    }
 }
 
 function displayLevelProgress(levelProgress) {

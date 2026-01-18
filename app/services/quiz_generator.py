@@ -327,7 +327,8 @@ def create_quiz(
 def evaluate_answer(
     db: Session,
     question_id: int,
-    selected_option: str
+    selected_option: str,
+    response_time_ms: int = None
 ) -> Dict:
     """
     Evaluate an answer and return result.
@@ -336,6 +337,7 @@ def evaluate_answer(
         db: Database session
         question_id: QuizQuestion ID
         selected_option: User's selected answer
+        response_time_ms: Optional response time in milliseconds
 
     Returns:
         Dictionary with evaluation result
@@ -350,11 +352,14 @@ def evaluate_answer(
     # Update question record
     question.is_correct = 1 if is_correct else 0
     question.chosen_option = selected_option
+    if response_time_ms is not None:
+        question.response_time_ms = response_time_ms
 
     return {
         "question_id": question_id,
         "is_correct": is_correct,
         "correct_answer": question.correct_option,
         "selected_answer": selected_option,
-        "letter_id": question.letter_id
+        "letter_id": question.letter_id,
+        "response_time_ms": response_time_ms
     }

@@ -59,10 +59,16 @@ class UserLetterStat(Base):
     last_result = Column(Text, CheckConstraint("last_result IN ('correct', 'incorrect')"), nullable=True)
     mastery_score = Column(Float, nullable=False, default=0.0)
 
+    # Spaced repetition scheduling
+    next_review_at = Column(DateTime, nullable=True)  # When letter is due for review
+    sr_interval_level = Column(Integer, nullable=False, default=0)  # Interval level (0-4)
+    last_review_result = Column(Text, CheckConstraint("last_review_result IN ('correct', 'incorrect')"), nullable=True)
+
     # Indexes for query performance
     __table_args__ = (
         Index('idx_user_mastery', 'user_id', 'mastery_score'),
         Index('idx_user_seen_count', 'user_id', 'seen_count'),
+        Index('idx_user_next_review', 'user_id', 'next_review_at'),
     )
 
     # Relationships
@@ -109,6 +115,9 @@ class QuizQuestion(Base):
     option_2 = Column(Text, nullable=True)
     option_3 = Column(Text, nullable=True)
     option_4 = Column(Text, nullable=True)
+
+    # Response time tracking for analytics
+    response_time_ms = Column(Integer, nullable=True)  # Time to answer in milliseconds
 
     # Constraints and indexes
     __table_args__ = (

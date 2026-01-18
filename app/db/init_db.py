@@ -112,11 +112,21 @@ def apply_schema_migrations(db: Session) -> None:
                     # Column might already exist (race condition)
                     logger.warning(f"Could not add column {col}: {e}")
 
-    # Migration 2: Add indexes to user_letter_stats
+        # Add response_time_ms column for response time analytics
+        if not check_column_exists(inspector, 'quiz_questions', 'response_time_ms'):
+            try:
+                logger.info("Adding column response_time_ms to quiz_questions table...")
+                db.execute(text("ALTER TABLE quiz_questions ADD COLUMN response_time_ms INTEGER"))
+                migrations_applied.append("Added column quiz_questions.response_time_ms")
+            except OperationalError as e:
+                logger.warning(f"Could not add column response_time_ms: {e}")
+
+    # Migration 2: Add indexes and spaced repetition columns to user_letter_stats
     if 'user_letter_stats' in existing_tables:
         indexes_to_add = [
             ('idx_user_mastery', 'CREATE INDEX IF NOT EXISTS idx_user_mastery ON user_letter_stats (user_id, mastery_score)'),
-            ('idx_user_seen_count', 'CREATE INDEX IF NOT EXISTS idx_user_seen_count ON user_letter_stats (user_id, seen_count)')
+            ('idx_user_seen_count', 'CREATE INDEX IF NOT EXISTS idx_user_seen_count ON user_letter_stats (user_id, seen_count)'),
+            ('idx_user_next_review', 'CREATE INDEX IF NOT EXISTS idx_user_next_review ON user_letter_stats (user_id, next_review_at)')
         ]
 
         for idx_name, sql in indexes_to_add:
@@ -127,6 +137,22 @@ def apply_schema_migrations(db: Session) -> None:
                     migrations_applied.append(f"Created index {idx_name}")
                 except OperationalError as e:
                     logger.warning(f"Could not create index {idx_name}: {e}")
+
+        # Spaced repetition columns
+        sr_columns = [
+            ('next_review_at', 'DATETIME'),
+            ('sr_interval_level', 'INTEGER NOT NULL DEFAULT 0'),
+            ('last_review_result', 'TEXT')
+        ]
+
+        for col_name, col_def in sr_columns:
+            if not check_column_exists(inspector, 'user_letter_stats', col_name):
+                try:
+                    logger.info(f"Adding column {col_name} to user_letter_stats table...")
+                    db.execute(text(f"ALTER TABLE user_letter_stats ADD COLUMN {col_name} {col_def}"))
+                    migrations_applied.append(f"Added column user_letter_stats.{col_name}")
+                except OperationalError as e:
+                    logger.warning(f"Could not add column {col_name}: {e}")
 
     # Migration 3: Add indexes to quiz_attempts
     if 'quiz_attempts' in existing_tables:

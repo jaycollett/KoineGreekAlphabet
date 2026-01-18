@@ -2,7 +2,7 @@
 
 A mobile-first adaptive quiz application to help users master recognition of all 24 Greek letters (uppercase and lowercase). Featuring intelligent spaced repetition, audio pronunciation support, and comprehensive progress tracking.
 
-**Version:** 1.4.2
+**Version:** 1.8.4
 
 ## Features
 
@@ -20,7 +20,7 @@ A mobile-first adaptive quiz application to help users master recognition of all
 - **Mobile-First Design**: Large touch targets, clean interface optimized for smartphones
 - **Progress Tracking**: View quiz history, accuracy stats, and per-letter mastery scores
 
-### Technical Features (v1.4.2)
+### Technical Features (v1.8.4)
 - **Auto-Migration System**: Database schema updates automatically on startup
 - **Performance Optimized**: Eager loading and SQL-level random sampling
 - **Structured Logging**: JSON logs for production, colored output for development
