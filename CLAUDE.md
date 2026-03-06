@@ -73,75 +73,23 @@ docker pull ghcr.io/jaycollett/koinegreekalphabet:1.0.0
 
 ## Release Process
 
-This project follows **semantic versioning** (MAJOR.MINOR.PATCH) and uses GitHub Releases to trigger automated Docker image builds.
-
-### Semantic Versioning Rules
-
-- **MAJOR** (1.0.0 → 2.0.0): Breaking changes, incompatible API changes
-- **MINOR** (1.0.0 → 1.1.0): New features, backwards-compatible
-- **PATCH** (1.0.0 → 1.0.1): Bug fixes, backwards-compatible
-
-**IMPORTANT**: Never use a 'v' prefix in version numbers (use `1.0.0`, not `v1.0.0`)
+Follows **semantic versioning** (MAJOR.MINOR.PATCH). No 'v' prefix in version numbers (use `1.0.0`, not `v1.0.0`).
 
 ### Creating a Release
 
-1. **Ensure all changes are committed and pushed to main branch**
-   ```bash
-   git add .
-   git commit -m "Prepare for release 1.0.0"
-   git push origin main
-   ```
-
-2. **Create and push a git tag** (without 'v' prefix)
-   ```bash
-   git tag 1.0.0
-   git push origin 1.0.0
-   ```
-
-3. **Create a GitHub Release**
-   - Go to GitHub repository → Releases → "Create a new release"
-   - Choose the tag you just pushed (e.g., `1.0.0`)
-   - Release title: Version number (e.g., `1.0.0`)
-   - Description: Changelog with features, fixes, and breaking changes
-   - Click "Publish release"
-
-4. **Automated Docker Build**
-   - GitHub Actions workflow (`.github/workflows/docker-publish.yml`) triggers automatically
-   - Builds Docker image from the tagged commit
-   - Publishes to GitHub Container Registry (ghcr.io)
-   - Tags image with:
-     - Version tag: `ghcr.io/jaycollett/koinegreekalphabet:1.0.0`
-     - Latest tag: `ghcr.io/jaycollett/koinegreekalphabet:latest`
+1. Commit and push all changes to main
+2. Tag and push: `git tag 1.0.0 && git push origin 1.0.0`
+3. Create a GitHub Release from the tag with a changelog description
+4. GitHub Actions (`.github/workflows/docker-publish.yml`) auto-builds and publishes to `ghcr.io/jaycollett/koinegreekalphabet:{version}` and `:latest`
 
 ### Release Checklist
 
-Before creating a release:
-- [ ] All tests passing (`pytest`)
-- [ ] Documentation updated (README, CLAUDE.md)
-- [ ] CHANGELOG updated with new version
-- [ ] Version follows semantic versioning
-- [ ] No uncommitted changes
-- [ ] Docker build works locally (`docker build -t test .`)
+- [ ] All tests passing (`pytest`) and Docker build works locally
+- [ ] CHANGELOG updated, no uncommitted changes
 
 ### Emergency Rollback
 
-If a release has issues:
-```bash
-# Pull previous version
-docker pull ghcr.io/jaycollett/koinegreekalphabet:1.0.0
-
-# Run previous version
-docker run -p 8000:8000 ghcr.io/jaycollett/koinegreekalphabet:1.0.0
-```
-
-### Pre-release Versions
-
-For beta/alpha releases, use semantic versioning with pre-release identifiers:
-- `1.0.0-alpha.1`
-- `1.0.0-beta.2`
-- `1.0.0-rc.1`
-
-These won't update the `latest` tag.
+Roll back by pulling and running the previous version tag: `docker run -p 8000:8000 ghcr.io/jaycollett/koinegreekalphabet:{previous-version}`
 
 ## Architecture
 
@@ -282,23 +230,9 @@ GitHub Actions workflow:
 
 ## Specialist Agents Available
 
-When working on this project, delegate tasks to specialized agents:
-
-- **python-project-engineer**: Backend logic, FastAPI endpoints, adaptive algorithm, tests
-- **sqlite-data-assistant**: Schema design, SQL queries, migrations, indexes
-- **test-ci-enforcer**: Test strategy, pytest configuration, CI setup
-- **code-review-refactor-coach**: Code review, refactoring suggestions
-- **git-repo-gardener**: Git workflow, branching strategy, history management
-- **devops-ubuntu-assistant**: Local environment setup, dependency installation
-- **kubernetes-docker-operator**: Dockerfile, docker-compose, K8s manifests
-
-## Non-Goals for v1
-
-- No user accounts, passwords, or authentication
-- No social features or sharing
-- No external analytics or third-party APIs
-- No email/SMS/push notifications
-- No internationalization beyond English letter names
+- **python-project-engineer**: Backend logic, FastAPI endpoints, adaptive algorithm, tests, schema/SQL
+- **code-quality-engineer**: Code review, refactoring, test strategy, pytest config, CI setup
+- **devops-ubuntu-assistant**: Local environment setup, Docker, dependency installation
 
 ## Important Constraints
 
